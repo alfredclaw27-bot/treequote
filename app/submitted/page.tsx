@@ -56,6 +56,13 @@ export default async function SubmittedPage({
         <p className="text-xs text-gray-400">
           Questions? Email us at mike@mtkinnovations.com
         </p>
+        {leadId && (
+          <Link href={`/customer/quotes/${leadId}`}>
+            <Button variant="secondary" className="w-full mt-2">
+              View Quotes for My Tree →
+            </Button>
+          </Link>
+        )}
       </div>
     </main>
   );

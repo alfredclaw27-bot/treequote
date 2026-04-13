@@ -11,6 +11,7 @@ export interface Lead {
   customer_id: string;
   photo_url: string;
   analysis_data: AnalysisData | null;
+  estimated_price?: EstimatedPrice;
   service_types: string[];
   address: string;
   latitude?: number;
@@ -30,6 +31,15 @@ export interface AnalysisData {
   accessNotes: string;
   seasonIndicators: string;
   confidence: number;
+  obstacles?: string[];
+  estimatedJobComplexity?: string;
+}
+
+export interface EstimatedPrice {
+  low: number;
+  high: number;
+  currency: "USD";
+  priceFactors: string[];
 }
 
 export interface Contractor {

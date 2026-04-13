@@ -1,146 +1,251 @@
-# Tree Service Lead Gen — MVP Specification
+# Tree Service Lead Gen — Full Vision Spec
 
 ## 1. Concept & Vision
 
-A mobile-first web app where **customers snap a photo of a tree** that needs service (removal, trimming, stump grinding, etc.) and receive competitive quotes from local contractors within hours. The app uses AI to analyze the photo and extract key details (tree type, height estimate, health, obstacles), packages everything into a qualified lead, and distributes it to contractors who pay per lead. Customers get quotes; contractors get business; we take a cut.
+A mobile-first web app where **customers snap a photo of a tree** and receive competitive quotes from local contractors within hours. AI analyzes the photo to extract tree details (species, height estimate, health, obstacles), packages everything into a qualified lead, and distributes it to contractors who pay per lead. Customers get quotes; contractors get business; we take a cut.
 
 **Vibe:** Trustworthy, fast, transparent. Feels like a modern home services platform — not a sketchy lead broker. Clean enough that contractors trust it with their money and customers trust it with their trees.
 
 ---
 
-## 2. Design Language
+## 2. Business Model
 
-- **Aesthetic:** Clean outdoorsy-professional. Think Angi's List meets a modern fintech app. Light, airy, with nature-green accents.
-- **Color palette:**
-  - Primary: `#16A34A` (green-600)
-  - Secondary: `#15803D` (green-700)
-  - Accent: `#F59E0B` (amber-500) — CTA buttons
-  - Background: `#F9FAFB` (gray-50)
-  - Surface: `#FFFFFF`
-  - Text: `#111827` (gray-900)
-  - Muted: `#6B7280` (gray-500)
-- **Typography:** Inter (Google Fonts) — clean, modern, readable on mobile
-- **Motion:** Subtle. Page transitions fade. Form steps slide in. Loading states use skeleton shimmer.
-- **Icons:** Lucide React — consistent, clean, mobile-friendly stroke icons
+### Revenue
+- **Contractors pay per lead** ($10-$50 depending on job complexity)
+- **Optional:** Premium contractor subscriptions for unlimited leads + priority placement
+- No cost to customers
 
----
+### Lead Distribution
+- Leads go to 3-5 contractors in the customer's zip code who have matching specialties
+- First contractor to pay gets the lead contact info (real-time bidding)
+- Multiple contractors can see the same lead but only contact details unlock on payment
+- If no contractor pays within 24h, lead goes to wider area
 
-## 3. Layout & Structure
+### Contractor Capability Matching
+Contractors set up their profile with:
+- Equipment: bucket trucks (reach up to X ft), chippers, stump grinders, etc.
+- Crew size: number of workers
+- Specialty: tree removal, pruning, stump grinding, palm, etc.
+- Service radius: zip codes
 
-### Pages
-
-1. **`/` — Landing Page**
-   - Hero: "Trees need work? Get quotes from local pros in minutes."
-   - Single CTA: "Get My Free Quote →" (scrolls to form)
-   - How it works (3 steps): Snap photo → AI analyzes → Contractors quote
-   - Trust signals: "No obligation", "Quotes in 24h", "Local contractors"
-
-2. **`/submit` — Customer Lead Submission**
-   - Step 1: Upload photo (drag/drop or camera)
-   - Step 2: Describe the work needed (checkboxes: removal, trimming, stump grinding, other)
-   - Step 3: Location (address input + geolocation autofill)
-   - Step 4: Contact info (name, phone, email)
-   - Step 5: Review & Submit
-   - Progress indicator across top
-
-3. **`/submitted` — Confirmation**
-   - "You're all set!" with lead ID
-   - "Contractors in your area have been notified. Expect quotes within 24 hours."
-   - Shows summary of what was submitted
-
-4. **`/contractor/login` — Contractor Auth**
-   - Email + password login via Supabase Auth
-   - "New contractor? Apply →" (links to `/contractor/apply`)
-
-5. **`/contractor/apply` — Contractor Application**
-   - Business name, contact info, service area (city/zip), specialties
-   - Approvals handled manually (admin flag in DB)
-
-6. **`/contractor/dashboard` — Contractor Portal**
-   - Tabs: **Leads** | **My Quotes** | **Account**
-   - **Leads tab:** List of available leads in their area (card with photo thumbnail, location, service type, price paid indicator). Click to expand → full analysis + "Quote This Lead" button.
-   - **My Quotes tab:** Quotes they've submitted with status (pending, accepted, rejected)
-   - **Account tab:** Profile, Stripe payment setup link
-
-7. **`/contractor/quote/[leadId]` — Quote Submission**
-   - Shows: Lead photo (full size), AI analysis summary, location map
-   - Form: Quote amount, notes to customer, estimated completion date
-   - Submit → Stripe payment for lead access ($5-$25 TBD, configurable)
-
-8. **`/admin` — Admin Dashboard** (simple, internal)
-   - All leads with status
-   - All contractors with approval toggle
-   - All quotes
+The AI uses this + photo analysis to give contractors a "match score" so they know which leads are best for them.
 
 ---
 
-## 4. Features & Interactions
+## 3. AI Analysis (GPT-4o Vision)
+
+### What It Extracts
+```
+species: string              // "Oak", "Pine", "Palm", "Unknown"
+heightEstimate: string       // "20-30 ft", "30-50 ft", "50+ ft"
+healthStatus: string         // "healthy" | "stressed" | "hazardous" | "dead"
+visibleDamage: string        // description of damage or disease
+accessNotes: string          // "fence present", "near power lines", "clear access"
+seasonIndicators: string     // "leafless (winter)", "full canopy (summer)"
+confidence: number           // 0.0-1.0
+obstacles: string[]          // ["fence", "house nearby", "power lines"]
+estimatedJobComplexity: string // "simple" | "moderate" | "complex" | "specialized"
+```
+
+### Tree Height Estimation Strategy
+GPT-4o estimates height from context clues (relative size of reference objects like houses, fences, cars, people) — no depth camera needed. Returns ranges like "30-40 ft" which is what contractors need anyway. This is standard industry practice for initial estimates.
+
+### Pricing Estimate (AI-Generated for Customer)
+After analysis, AI generates a **customer-facing estimate range**:
+```
+estimatedPrice: { low: number, high: number, currency: "USD" }
+priceFactors: string[]  // ["Large oak, 40ft", "Near house — careful removal needed", "Easy access from driveway"]
+```
+This is shown to the customer before contractors quote (transparent, builds trust). Contractors see the same analysis and their own quote form.
+
+---
+
+## 4. Pages & User Flows
 
 ### Customer Flow
-- **Photo upload:** Accept JPG/PNG, max 10MB. Show preview immediately. Compress client-side before upload to Supabase Storage.
-- **Location:** Google Places Autocomplete for address. Also "Use my location" button.
-- **AI Analysis:** On photo upload, call OpenAI GPT-4o (or Gemini) to extract:
-  - Tree species/type (if visible)
-  - Estimated height range
-  - Health assessment (healthy, stressed, hazardous)
-  - Visible damage or concerns
-  - Equipment access notes (e.g., "fence present", "limited access")
-  - Current season indicators
-- **Lead status:** `new` → `quoted` → `contractor_contacted` (future)
-- **No payment** required from customers. Free to submit.
+
+#### `/` — Landing Page
+- Hero: "Trees need work? Get quotes from local pros in minutes."
+- Single CTA: "Get My Free Quote →"
+- How it works (3 steps): Snap → AI analyzes → Contractors quote
+- Trust signals: "No obligation", "Quotes in 24h", "Local contractors"
+- Already built ✅
+
+#### `/submit` — Customer Lead Submission
+5-step wizard: Photo → Services → Location → Contact → Review
+- Step 1: Upload photo (drag/drop or camera)
+- Step 2: Services needed (checkboxes)
+- Step 3: Address input
+- Step 4: Contact info
+- Step 5: Review & submit
+- Progress indicator
+- **Shows AI price estimate on review step** (if analysis done)
+- Already built ✅
+
+#### `/submitted` — Confirmation
+- "You're all set!" with lead ID
+- "Contractors notified. Expect quotes within 24 hours."
+- Shows summary + AI analysis preview
+
+#### `/customer/quotes/[leadId]` — Customer's Quotes View
+- Shows all quotes received for their lead
+- Each quote: contractor name, amount, notes, timestamp
+- Customer can accept a quote (which notifies the contractor)
+- Accepting doesn't lock them in — just means "I want to work with this contractor"
+- Status: waiting → quotes received → accepted → job booked (manual follow-up)
 
 ### Contractor Flow
-- Apply → admin approves → contractor can access leads
-- Leads in their service area shown first; others hidden
-- To quote: must pay via Stripe ($10/lead, configurable in env)
-- Payment → lead contact details revealed for 24h
-- Customer receives email with contractor's quote
 
-### AI Analysis (OpenAI GPT-4o Vision)
-- Prompt: Analyze this tree photo. Provide JSON with: species, heightEstimate, healthStatus, visibleDamage, accessNotes, seasonIndicators, confidence
-- Fallback: If API fails, store "analysis pending" and retry
-- Store full analysis JSON in `leads.analysis_data`
+#### `/contractor/login` — Login
+- Email + password (Supabase Auth)
+- Already built ✅
 
-### Google Maps Integration
-- Store coordinates from Places autocomplete
-- Verify location is real and in service area (configurable)
-- Display map on lead card for contractors
+#### `/contractor/apply` — Application
+- Business name, contact info, service area (zip codes), specialties
+- Equipment/crew info: bucket truck reach, crew size, stump grinder available, etc.
+- "Apply" button → pending approval
+- Admin approves in `/admin`
 
-### PWA
-- Service worker for offline resilience
-- Add to home screen prompt
-- Works in Safari (iOS) and Chrome (Android)
+#### `/contractor/dashboard` — Main Portal
+3 tabs: **Leads** | **My Quotes** | **Profile**
+
+**Leads tab:**
+- List of leads in contractor's service area
+- Each shows: photo thumbnail, service type, location, AI analysis summary, "match score"
+- Sort: newest, match score, price estimate
+- "Quote This Lead" button → leads to quote form
+- Lead card shows: height estimate, health status, complexity, obstacles
+- Leads marked as new vs. already quoted
+
+**My Quotes tab:**
+- Quotes submitted with status (pending, accepted, rejected)
+- Click to see quote details + lead details
+
+**Profile tab:**
+- Business info, equipment setup, service area
+- Stripe payment setup
+- Lead pricing info ($X per lead)
+
+#### `/contractor/quote/[leadId]` — Quote Submission
+- Shows lead photo (full size, expandable)
+- Shows AI analysis: species, height, health, access notes, complexity
+- Shows customer-facing price estimate (helps contractor price competitively)
+- Form: quote amount, notes to customer, estimated completion date
+- Submit → Stripe payment ($10/lead) → lead contact info revealed for 24h
+- If Stripe fails, quote not submitted
+
+#### `/contractor/profile` — Equipment & Crew Setup
+- Bucket truck reach (dropdown: <30ft, 30-50ft, 50-75ft, 75+ft)
+- Crew size (1-10+)
+- Equipment available: chipper, stump grinder, climber, etc.
+- Specialties checkboxes
+- Service area (zip codes)
+- This info used for match scoring
+
+### Admin Flow
+
+#### `/admin` — Admin Dashboard
+- All leads with status, AI analysis preview, quote count
+- All contractors with approval toggle
+- Approve/reject contractor applications
+- Simple table views, no fancy charts needed yet
 
 ---
 
-## 5. Component Inventory
+## 5. AI Pricing Estimation Logic
 
-### Shared
-- `<Button>` — variants: primary (amber), secondary (green outline), ghost
-- `<Input>` — text, email, phone; with label and error state
-- `<Card>` — white surface, shadow-sm, rounded-xl
-- `<Badge>` — status indicators (green=new, blue=quoted, gray=closed)
-- `<Skeleton>` — loading shimmer for cards/lists
-- `<ProgressBar>` — multi-step form indicator
+Based on analysis data + service type, generate a price range:
 
-### Customer
-- `<PhotoUploader>` — drag/drop zone, camera capture, preview, compression
-- `<ServiceSelector>` — checkbox grid: Tree Removal, Trimming/Pruning, Stump Grinding, Palm Cleaning, Other
-- `<LocationInput>` — Google Places autocomplete + geolocation button
-- `<LeadSummaryCard>` — photo thumb, service type, location, AI analysis snippet
+```
+BASE_PRICES = {
+  removal: { small: 500, medium: 1500, large: 4000 },  // 3 size tiers
+  trimming: { small: 150, medium: 400, large: 1000 },
+  stump: { small: 100, medium: 300, large: 750 },
+  palm: { small: 150, medium: 350, large: 600 },
+}
 
-### Contractor
-- `<LeadCard>` — thumbnail, service type badge, location, distance, price paid indicator, expand button
-- `<QuoteForm>` — amount input, notes textarea, date picker, submit
-- `<AnalysisDisplay>` — formatted AI output with icons
+MODIFIERS = {
+  healthy: 1.0,
+  stressed: 1.2,    // more work
+  hazardous: 1.5,   // extra caution needed
+  dead: 0.8,        // no foliage to deal with
+  fence: 1.15,      // harder access
+  house_nearby: 1.2, // careful removal
+  power_lines: 1.3,  // special handling
+  large_size: 1.5,  // bigger tree
+}
+```
+
+GPT-4o returns the analysis, then the API applies pricing logic to generate `estimatedPrice`. This is shown to both customer and contractors.
 
 ---
 
-## 6. Technical Approach
+## 6. Lead Gen Business Model (Reference)
 
-### Stack
+**How Angie's List/HomeAdvisor work:**
+1. Contractor signs up, picks service categories + zip codes
+2. Customers submit requests (similar to our photo flow)
+3. Leads distributed to contractors in that zip code
+4. Contractors pay per lead ($15-$150 depending on service type)
+5. Contractor gets customer contact info upon payment
+6. Platform takes 30-50% cut
+
+**Our differentiator:**
+- AI photo analysis = we give contractors WAY more info than a text request
+- Price estimate upfront = transparency for customers
+- Match scoring = contractors don't waste time on wrong leads
+- Photo-centric = much more informative than text forms
+
+---
+
+## 7. Marketing & Growth Strategy
+
+### Initial Customer Acquisition
+1. **Nextdoor** — neighborhood-specific posts about tree service needs
+2. **Facebook Marketplace** — tree service listings
+3. **Google Local Service Ads** — when people search "tree removal near me"
+4. **Nextdoor Ads** — hyper-local targeting
+5. **SEO** — "tree removal cost estimator [city]" + blog content
+
+### Initial Contractor Acquisition
+1. **Cold outreach** — find tree service companies on Google Maps in target cities, email/call them
+2. **Facebook Groups** — tree service contractor groups
+3. **Yelp** — reach out to highly-rated tree services
+4. **Industry forums** — arborist forums, equipment manufacturer forums
+
+### Launch Strategy
+1. Pick 1 city to start (Atlanta based on demo data)
+2. Get 10 contractors signed up before launch
+3. Drive traffic with Nextdoor + Facebook ads ($500 test)
+4. Target keywords: "tree removal [city]", "tree trimming near me"
+
+---
+
+## 8. PWA vs Native App Decision
+
+**Decision: PWA (Progressive Web App) — keep existing approach**
+
+**Reasons:**
+- iOS/Android native would require separate codebases
+- PWA with `@ducanh2912/next-pwa` works well on both mobile and desktop
+- Service worker enables offline resilience and home screen installation
+- No app store review process = faster iteration
+- Most users won't notice/care it's not native
+- Same approach Airbnb, Uber, Twitter (now X) used for their initial mobile products
+
+**If PWA hits limitations (unlikely for this use case):**
+- Camera access works in PWAs
+- Push notifications work
+- Can add homescreen shortcut
+- Would only go native if we needed background processing, Bluetooth, or AR features
+
+---
+
+## 9. Technical Architecture
+
+### Stack (unchanged — already optimal)
 - **Framework:** Next.js 14 (App Router, TypeScript)
-- **Styling:** Tailwind CSS
+- **Styling:** Tailwind CSS v4
 - **Database + Auth + Storage:** Supabase (PostgreSQL, Row Level Security)
 - **AI:** OpenAI GPT-4o (Vision) for image analysis
 - **Maps:** Google Maps JavaScript API + Places Autocomplete
@@ -148,163 +253,110 @@ A mobile-first web app where **customers snap a photo of a tree** that needs ser
 - **PWA:** `@ducanh2912/next-pwa`
 - **Deployment:** Vercel
 
-### Database Schema
+### Database Schema Updates
 
 ```sql
--- customers (tracked for lead ownership)
-CREATE TABLE customers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+-- Add to leads table
+analysis_data JSONB,        -- already exists
+estimated_price JSONB,      -- {low, high, currency, factors} NEW
+customer_visible boolean DEFAULT true,
 
--- leads
-CREATE TABLE leads (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_id UUID REFERENCES customers(id),
-  photo_url TEXT NOT NULL,
-  analysis_data JSONB, -- {species, heightEstimate, healthStatus, ...}
-  service_types TEXT[] NOT NULL, -- ['removal', 'trimming', etc]
-  address TEXT NOT NULL,
-  latitude DECIMAL(10, 8),
-  longitude DECIMAL(11, 8),
-  google_maps_verified BOOLEAN DEFAULT false,
-  status TEXT DEFAULT 'new', -- new | quoted | closed
-  stripe_payment_id TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+-- Contractor profiles (extended from auth)
+ALTER TABLE contractors ADD COLUMN equipment JSONB;
+ALTER TABLE contractors ADD COLUMN crew_size INTEGER;
+ALTER TABLE contractors ADD COLUMN bucket_truck_reach TEXT;  -- "<30ft", "30-50ft", "50-75ft", "75+ft"
+ALTER TABLE contractors ADD COLUMN has_stump_grinder BOOLEAN DEFAULT false;
+ALTER TABLE contractors ADD COLUMN has_chipper BOOLEAN DEFAULT false;
 
--- contractors
-CREATE TABLE contractors (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT UNIQUE NOT NULL,
-  business_name TEXT NOT NULL,
-  phone TEXT,
-  service_area TEXT[], -- zip codes or city names
-  specialties TEXT[],
-  approved BOOLEAN DEFAULT false,
-  stripe_customer_id TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+-- Quotes
+ALTER TABLE quotes ADD COLUMN stripe_payment_id TEXT;
+ALTER TABLE quotes ADD COLUMN contact_revealed_at TIMESTAMPTZ;
 
--- quotes
-CREATE TABLE quotes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- Lead-bid tracking (who viewed/paid for which lead)
+CREATE TABLE lead_access (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   lead_id UUID REFERENCES leads(id),
   contractor_id UUID REFERENCES contractors(id),
-  amount DECIMAL(10, 2) NOT NULL,
-  notes TEXT,
-  estimated_date DATE,
-  status TEXT DEFAULT 'pending', -- pending | accepted | rejected
+  paid BOOLEAN DEFAULT false,
   stripe_payment_id TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+  accessed_at TIMESTAMPTZ DEFAULT now()
 );
-
--- admin env: ADMIN_EMAIL, OPENAI_API_KEY, STRIPE_SECRET_KEY, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 ```
 
-### API Routes
-- `POST /api/leads` — create lead (customer submits)
-- `GET /api/leads/[id]` — get lead (authenticated contractor who paid)
-- `POST /api/leads/[id]/analyze` — trigger AI analysis
-- `POST /api/contractors/apply` — contractor application
-- `POST /api/quotes` — submit quote + trigger Stripe payment
-- `POST /api/webhooks/stripe` — handle payment confirmations
-
-### Environment Variables
-```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-OPENAI_API_KEY=
-STRIPE_SECRET_KEY=
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-STRIPE_WEBHOOK_SECRET=
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
-ADMIN_EMAIL=mike@mtkinnovations.com
-LEAD_PRICE_CENTS=1000
-```
-
-### Auth Strategy
-- **Customers:** No auth needed. Lead tied to session cookie (UUID stored in httpOnly cookie).
-- **Contractors:** Supabase Auth (email/password). JWT checked in middleware.
-- **Admin:** Simple env-based check (ADMIN_EMAIL).
+### API Routes to Add
+- `GET /api/leads/available` — contractor gets leads in their area
+- `POST /api/contractors/profile` — update equipment/crew info
+- `POST /api/contractors/leads/[id]/access` — pay for lead access + Stripe
+- `GET /api/customers/[leadId]/quotes` — customer sees all quotes for their lead
+- `POST /api/customers/quotes/[quoteId]/accept` — customer accepts a quote
 
 ---
 
-## 7. File Structure
+## 10. File Structure (Current)
 
+Already built in the existing codebase. Key structure:
 ```
-tree-service-lead-gen/
-├── SPEC.md
-├── .env.local.example
-├── next.config.js
-├── tailwind.config.ts
-├── app/
-│   ├── layout.tsx
-│   ├── page.tsx                    # Landing page
-│   ├── globals.css
-│   ├── submit/
-│   │   └── page.tsx                # Customer lead form
-│   ├── submitted/
-│   │   └── page.tsx                # Confirmation
-│   ├── contractor/
-│   │   ├── login/page.tsx
-│   │   ├── apply/page.tsx
-│   │   ├── dashboard/page.tsx
-│   │   └── quote/[leadId]/page.tsx
-│   ├── admin/
-│   │   └── page.tsx
-│   └── api/
-│       ├── leads/route.ts
-│       ├── leads/[id]/route.ts
-│       ├── leads/[id]/analyze/route.ts
-│       ├── contractors/apply/route.ts
-│       ├── quotes/route.ts
-│       └── webhooks/stripe/route.ts
-├── components/
-│   ├── ui/                         # Button, Input, Card, Badge, etc.
-│   ├── PhotoUploader.tsx
-│   ├── ServiceSelector.tsx
-│   ├── LocationInput.tsx
-│   ├── LeadCard.tsx
-│   ├── AnalysisDisplay.tsx
-│   └── QuoteForm.tsx
-├── lib/
-│   ├── supabase/
-│   │   ├── client.ts
-│   │   └── server.ts
-│   ├── openai.ts
-│   ├── stripe.ts
-│   └── google-maps.ts
-├── types/
-│   └── index.ts
-└── public/
-    ├── manifest.json
-    └── icons/
+app/
+├── page.tsx                          # Landing ✅
+├── submit/page.tsx                    # Customer wizard ✅
+├── submitted/page.tsx                # Confirmation
+├── contractor/
+│   ├── login/page.tsx               # Login ✅
+│   ├── apply/page.tsx               # Apply
+│   ├── dashboard/page.tsx           # Dashboard ✅
+│   ├── quote/[leadId]/page.tsx      # Quote form
+│   └── profile/page.tsx             # Equipment setup (NEW)
+├── customer/
+│   └── quotes/[leadId]/page.tsx      # Customer view quotes (NEW)
+├── admin/page.tsx                   # Admin ✅
+└── api/
+    ├── leads/route.ts               # Create lead ✅
+    ├── leads/[id]/route.ts          # Get lead ✅
+    ├── leads/[id]/analyze/route.ts  # AI analysis ✅
+    ├── leads/[id]/quotes/route.ts   # Quotes for lead
+    ├── contractors/apply/route.ts   # Apply ✅
+    ├── quotes/route.ts              # Create quote
+    └── webhooks/stripe/route.ts     # Stripe webhooks
 ```
 
 ---
 
-## 8. MVP Scope — What to Build Now
+## 11. MVP Improvements Needed
 
-**Must have (MVP):**
-- Landing page with clear CTA
-- Full customer submission flow (photo → form → submit → confirm)
-- AI analysis of uploaded photo (real GPT-4o Vision call)
-- Supabase storage for photos + DB for leads
-- Contractor apply/login (auth, no Stripe yet — manual approval)
-- Contractor dashboard with lead list (mock leads for now, real leads once customers submit)
-- Quote submission form
-- Basic admin view
-- PWA manifest + service worker
+Based on existing code review:
 
-**Nice to have (later):**
-- Real Stripe integration (stub it for now)
-- Email notifications (stub with console.log for now)
-- Google Maps geolocation (stub address input for now)
-- Full RLS policies
+### Must Fix/Add (MVP priority)
+1. **Quote submission flow** — `/contractor/quote/[leadId]` needs full Stripe payment flow
+2. **Customer quotes view** — `/customer/quotes/[leadId]` doesn't exist yet
+3. **Contractor profile/equipment setup** — contractors can't set their equipment info
+4. **AI pricing estimation** — `estimatedPrice` not being generated in the analysis
+5. **Stripe integration** — the API route for quotes needs real Stripe payment
+6. **Lead access tracking** — track which contractors paid for which leads
+7. **Match scoring** — show contractors how well a lead matches their equipment
 
-Build the full Next.js app. Make it real and functional. Use real API keys where available.
+### Nice to Have
+- Email notifications (nodemailer or Resend)
+- Google Maps integration for location (currently just text address)
+- Real contractor approval workflow in admin
+- Service worker PWA configuration
+- Push notifications for new quotes
+
+---
+
+## 12. Decisions Needed from Mike
+
+1. **Lead price point**: $10/lead for MVP? Or tiered ($10 removal, $5 trimming)? Industry is $15-150. I'd start at $15 for removal leads, $5 for trimming/stump.
+
+2. **Cities to launch**: Atlanta is demo-ready. Should we launch there or pick a different market?
+
+3. **Contractor onboarding**: Manual approval for now (admin flips a boolean). Is that okay or do we need self-serve?
+
+4. **Quote validity**: Once a contractor pays $10, they see customer contact for 24h. Should we extend that window? Or let them see it indefinitely after payment?
+
+5. **Multi-contractor bidding**: Our model means the FIRST contractor to pay wins. Alternative: show quotes to customer in real-time and they pick. Which do we want to implement first?
+
+6. **AI price estimate visibility**: Show AI's estimated price range to BOTH customer and contractors? Or only customer? Or only contractors? Showing it to both creates transparency but contractors might feel constrained.
+
+---
+
+*Last updated: 2026-04-13*
