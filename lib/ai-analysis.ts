@@ -1,4 +1,5 @@
 import type { AnalysisData, EstimatedPrice } from "@/types";
+import OpenAI from "openai";
 
 const BASE_PRICES: Record<string, { small: number; medium: number; large: number }> = {
   removal: { small: 500, medium: 1500, large: 4000 },
@@ -12,7 +13,6 @@ export function generatePriceEstimate(
   analysis: AnalysisData,
   serviceTypes: string[]
 ): EstimatedPrice {
-  // Determine size tier from height estimate
   const heightStr = analysis.heightEstimate ?? "";
   let size: "small" | "medium" | "large" = "medium";
   if (heightStr.includes("<") || heightStr.includes("under") || /\d+/.test(heightStr)) {
@@ -34,12 +34,10 @@ export function generatePriceEstimate(
     dead: 0.8,
   };
 
-  // Determine modifier from health status
   const healthMod = modifiers[analysis.healthStatus] ?? 1.0;
   if (analysis.healthStatus === "hazardous") priceFactors.push("Hazardous — requires careful handling");
   if (analysis.healthStatus === "stressed") priceFactors.push("Stressed tree — extra care needed");
 
-  // Check access notes for obstacles
   const accessLower = (analysis.accessNotes ?? "").toLowerCase();
   if (accessLower.includes("fence")) { priceFactors.push("Fence limits access"); }
   if (accessLower.includes("house") || accessLower.includes("near structure")) { priceFactors.push("Structure nearby — careful removal needed"); }
@@ -47,14 +45,12 @@ export function generatePriceEstimate(
   if (accessLower.includes("clear") || accessLower.includes("easy")) { priceFactors.push("Good equipment access"); }
   if (accessLower.includes("limited")) { priceFactors.push("Limited access — more labor"); }
 
-  // Check for obstacles array if present
   if (analysis.obstacles && analysis.obstacles.length > 0) {
     analysis.obstacles.forEach((o: string) => {
       priceFactors.push(`Obstacle: ${o}`);
     });
   }
 
-  // Calculate price range per service type
   const ranges = serviceTypes.map((svc) => {
     const base = BASE_PRICES[svc] ?? BASE_PRICES.other;
     const sizePrice = base[size];
@@ -64,7 +60,6 @@ export function generatePriceEstimate(
     };
   });
 
-  // Combine — use widest range
   const low = Math.min(...ranges.map((r) => r.low));
   const high = Math.max(...ranges.map((r) => r.high));
 
@@ -81,12 +76,9 @@ export function generatePriceEstimate(
 }
 
 export async function analyzeTreePhoto(imageUrl: string): Promise<{ analysis: AnalysisData; estimatedPrice: EstimatedPrice; serviceTypes: string[] }> {
-  const { openai } = await import("@/lib/openai");
-  const { default: OpenAI } = await import("openai");
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-  const response = await client.chat.completions.create({
+  const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
@@ -103,7 +95,7 @@ export async function analyzeTreePhoto(imageUrl: string): Promise<{ analysis: An
   "accessNotes": "notes on equipment access (e.g., 'fence present, limited access', 'clear access from driveway', 'near power lines')",
   "seasonIndicators": "current season indicators (e.g., 'leafless (winter)', 'full canopy (summer)', 'blooming (spring)')",
   "confidence": 0.0 to 1.0 reflecting how confident you are in your assessment",
-  "obstacles": ["list of obstacles like 'fence', 'house', 'power lines', 'limited space'],
+  "obstacles": ["list of obstacles like 'fence', 'house', 'power lines', 'limited space"],
   "estimatedJobComplexity": "simple | moderate | complex | specialized"
 }
 Be specific and practical. If you can't determine something, say 'undetermined' rather than guessing.`,
@@ -122,9 +114,7 @@ Be specific and practical. If you can't determine something, say 'undetermined' 
   const jsonStr = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   const analysis = JSON.parse(jsonStr) as AnalysisData;
 
-  // For now, guess service types from species/condition (contractor will know best)
-  // The actual service types come from the lead submission
-  const serviceTypes = ["removal"]; // placeholder — real service types come from lead submission
+  const serviceTypes = ["removal"];
   const estimatedPrice = generatePriceEstimate(analysis, serviceTypes);
 
   return { analysis, estimatedPrice, serviceTypes };

@@ -29,7 +29,6 @@ const EQUIPMENT_OPTIONS = [
   { id: "chipper", label: "Chipper", icon: "🌿" },
   { id: "climbing_gear", label: "Climbing Gear", icon: "🧗" },
   { id: "crane", label: "Crane / Lift", icon: "🏗️" },
-  { id: "stump_grinder", label: "Stump Grinder", icon: "⚙️" },
 ];
 
 export default function ContractorProfilePage() {

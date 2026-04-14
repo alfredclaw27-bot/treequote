@@ -326,20 +326,38 @@ app/
 Based on existing code review:
 
 ### Must Fix/Add (MVP priority)
-1. **Quote submission flow** — `/contractor/quote/[leadId]` needs full Stripe payment flow
-2. **Customer quotes view** — `/customer/quotes/[leadId]` doesn't exist yet
-3. **Contractor profile/equipment setup** — contractors can't set their equipment info
-4. **AI pricing estimation** — `estimatedPrice` not being generated in the analysis
-5. **Stripe integration** — the API route for quotes needs real Stripe payment
-6. **Lead access tracking** — track which contractors paid for which leads
-7. **Match scoring** — show contractors how well a lead matches their equipment
+1. ~~**Quote submission flow**~~ — `/contractor/quote/[leadId]` needs full Stripe payment flow (mostly done)
+2. ~~**Customer quotes view**~~ — `/customer/quotes/[leadId]` exists ✅
+3. ~~**Contractor profile/equipment setup**~~ — `/contractor/profile` exists ✅
+4. ~~**AI pricing estimation**~~ — `generatePriceEstimate()` in `lib/ai-analysis.ts` ✅
+5. **Stripe integration** — stubbed, needs real keys
+6. ~~**Lead access tracking**~~ — `lead_access` table in schema ✅
+7. **Match scoring** — show contractors how well a lead matches their equipment (partially done via mock data)
 
 ### Nice to Have
 - Email notifications (nodemailer or Resend)
 - Google Maps integration for location (currently just text address)
 - Real contractor approval workflow in admin
-- Service worker PWA configuration
 - Push notifications for new quotes
+
+## 12. Testing
+
+### Playwright E2E Testing (Active)
+- 48 tests covering all major pages and flows
+- Chromium and Mobile Safari (WebKit)
+- Run tests: `npm test`
+- Run Chromium only: `npm run test:chromium`
+- Run headed: `npm run test:headed`
+- Install browsers: `npm run playwright:install`
+
+### Test Coverage
+- Landing page (hero, CTA, navigation)
+- Customer submission wizard (all 5 steps)
+- Contractor login + apply flow
+- Contractor dashboard (auth guard, tabs)
+- Admin dashboard (leads, contractors, quotes)
+- Mobile viewport rendering
+- Multi-select specialty toggles
 
 ---
 

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS leads (
   customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
   photo_url TEXT NOT NULL,
   analysis_data JSONB,
+  estimated_price JSONB,  -- {low, high, currency, priceFactors[]}
   service_types TEXT[] NOT NULL DEFAULT '{}',
   address TEXT NOT NULL,
   latitude DECIMAL(10, 8),
@@ -35,13 +36,13 @@ CREATE TABLE IF NOT EXISTS leads (
 CREATE TABLE IF NOT EXISTS contractors (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
   business_name TEXT NOT NULL,
   phone TEXT,
   service_area TEXT[] DEFAULT '{}',
   specialties TEXT[] DEFAULT '{}',
   approved BOOLEAN DEFAULT false,
   stripe_customer_id TEXT,
+  equipment JSONB DEFAULT '{}',  -- {bucketReach, crewSize, equipment: []}
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -56,6 +57,17 @@ CREATE TABLE IF NOT EXISTS quotes (
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
   stripe_payment_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Lead Access (tracks which contractors paid to view which leads)
+CREATE TABLE IF NOT EXISTS lead_access (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+  contractor_id UUID REFERENCES contractors(id) ON DELETE SET NULL,
+  paid BOOLEAN DEFAULT false,
+  stripe_payment_id TEXT,
+  accessed_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(lead_id, contractor_id)
 );
 
 -- Row Level Security
