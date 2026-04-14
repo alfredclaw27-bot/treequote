@@ -19,6 +19,8 @@ export interface Lead {
   google_maps_verified: boolean;
   status: "new" | "quoted" | "closed";
   stripe_payment_id?: string;
+  notifications_sent?: number;
+  notification_targets?: string[];
   created_at: string;
   customer?: Customer;
 }

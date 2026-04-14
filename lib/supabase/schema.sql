@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS leads (
   google_maps_verified BOOLEAN DEFAULT false,
   status TEXT DEFAULT 'new' CHECK (status IN ('new', 'quoted', 'closed')),
   stripe_payment_id TEXT,
+  notifications_sent INTEGER DEFAULT 0,
+  notification_targets TEXT[] DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

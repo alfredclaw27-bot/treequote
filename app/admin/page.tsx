@@ -70,16 +70,33 @@ export default function AdminPage() {
                     <p className="font-medium text-gray-900 capitalize truncate">{lead.service_types.join(", ")}</p>
                     <p className="text-sm text-gray-500 truncate">{lead.address}</p>
                     <p className="text-xs text-gray-400">{new Date(lead.created_at).toLocaleString()}</p>
+                    {(lead.notifications_sent ?? 0) > 0 && (
+                      <p className="text-xs text-green-600 font-medium">📧 {lead.notifications_sent} contractor{(lead.notifications_sent ?? 0) === 1 ? "" : "s"} notified</p>
+                    )}
                   </div>
-                  <select
-                    value={lead.status}
-                    onChange={(e) => updateLeadStatus(lead.id, e.target.value)}
-                    className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm"
-                  >
-                    <option value="new">New</option>
-                    <option value="quoted">Quoted</option>
-                    <option value="closed">Closed</option>
-                  </select>
+                  <div className="flex gap-2 items-center">
+                    <select
+                      value={lead.status}
+                      onChange={(e) => updateLeadStatus(lead.id, e.target.value)}
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm"
+                    >
+                      <option value="new">New</option>
+                      <option value="quoted">Quoted</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                    <button
+                      onClick={async () => {
+                        const res = await fetch(`/api/notifications/send-lead-alerts?leadId=${lead.id}`);
+                        const data = await res.json();
+                        alert(`Sent ${data.sent ?? 0} notifications${data.errors?.length ? ` — errors: ${data.errors.join(", ")}` : ""}`);
+                        window.location.reload();
+                      }}
+                      className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-200 transition-colors"
+                      title="Manually resend lead alerts to contractors"
+                    >
+                      🔄 Resend Alerts
+                    </button>
+                  </div>
                 </Card>
               ))}
             </div>

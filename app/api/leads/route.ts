@@ -19,14 +19,29 @@ export async function POST(req: NextRequest) {
 
   const { customer_id, photo_url, service_types, address, latitude, longitude } = body;
 
-  if (!photo_url || !service_types || !address || !customer_id) {
+  if (!photo_url || !service_types || !address) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  // Create the customer if not exists
+  let customerId = customer_id;
+  if (!customerId) {
+    const { data: customer, error: customerError } = await supabase
+      .from("customers")
+      .insert({ name: "Customer", email: null, phone: null })
+      .select("id")
+      .single();
+
+    if (customerError || !customer) {
+      return NextResponse.json({ error: "Failed to create customer" }, { status: 500 });
+    }
+    customerId = customer.id;
+  }
+
+  const { data: lead, error: leadError } = await supabase
     .from("leads")
     .insert({
-      customer_id,
+      customer_id: customerId,
       photo_url,
       service_types,
       address,
@@ -37,6 +52,21 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+  if (leadError) return NextResponse.json({ error: leadError.message }, { status: 500 });
+
+  // Trigger AI analysis and contractor notifications in the background
+  // (fire-and-forget — don't block the response)
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  fetch(`${baseUrl}/api/leads/${lead.id}/analyze`, { method: "POST" }).catch((e) =>
+    console.error("[LeadCreated] AI analysis trigger failed:", e)
+  );
+  fetch(`${baseUrl}/api/notifications/send-lead-alerts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leadId: lead.id }),
+  }).catch((e) =>
+    console.error("[LeadCreated] Notification trigger failed:", e)
+  );
+
+  return NextResponse.json(lead, { status: 201 });
 }
