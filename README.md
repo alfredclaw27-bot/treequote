@@ -50,6 +50,8 @@ CREATE TABLE leads (
   google_maps_verified BOOLEAN DEFAULT false,
   status TEXT DEFAULT 'new',
   stripe_payment_id TEXT,
+  notifications_sent INTEGER DEFAULT 0,
+  notification_targets TEXT[] DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -150,6 +152,17 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe
 
 ---
 
+### 6. Resend (Email Notifications)
+
+1. Get a free API key at [resend.com](https://resend.com) (100 emails/day free)
+2. Add to `.env.local`:
+```env
+RESEND_API_KEY=re_your_key_here
+```
+3. Contractor notification emails are sent automatically when a lead is submitted
+
+---
+
 ### 6. Environment Variables
 
 Create a `.env.local` file:
@@ -202,6 +215,15 @@ No Supabase or API keys needed to explore the app! When on the contractor login 
 1. Visit `/submit` → upload tree photo → add address + service type
 2. AI analyzes the photo → lead is created in Supabase
 3. Customer views quotes at `/customer/quotes/[leadId]`
+
+### Auto-Notification Flow (No Contractors Needed!)
+When a lead comes in, the system automatically:
+1. Runs AI analysis on the photo
+2. Matches against 10 seeded Atlanta-area contractors by zip code + specialty
+3. Sends branded HTML emails to up to 10 matching contractors
+4. Admin can see who was notified and resend manually from `/admin`
+
+No contractor sign-up or Stripe needed to get started! Just add your **Resend API key** and leads get distributed automatically.
 
 ### Contractor Flow
 1. Visit `/contractor/apply` → apply + get approved
