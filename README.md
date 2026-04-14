@@ -183,8 +183,16 @@ ADMIN_EMAIL=you@example.com
 ```bash
 npm run dev        # Development server
 npm run build -- --webpack  # Production build (use --webpack flag)
-npx playwright test  # Run tests
+npx playwright test  # Run tests (38 tests, all passing)
 ```
+
+---
+
+## 🧪 Demo Mode
+
+No Supabase or API keys needed to explore the app! When on the contractor login page (`/contractor/login`), click **"Explore Demo Account"** — it loads the full contractor dashboard with mock leads and quotes so you can see everything working immediately.
+
+![Demo Mode Banner on login page]()
 
 ---
 
