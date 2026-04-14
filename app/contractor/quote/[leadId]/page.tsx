@@ -1,13 +1,14 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AnalysisDisplay } from "@/components/AnalysisDisplay";
 import { QuoteForm } from "@/components/QuoteForm";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { ArrowLeft, MapPin, Clock } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { ArrowLeft, MapPin, Clock, CreditCard, CheckCircle } from "lucide-react";
 import type { Lead } from "@/types";
 import { LEAD_PRICE_CENTS } from "@/lib/stripe";
 
@@ -49,14 +50,24 @@ const MOCK_LEADS: Record<string, Lead> = {
   },
 };
 
-export default function QuotePage() {
+function QuotePageContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const leadId = params.leadId as string;
   const supabase = createClient();
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [hasAccess, setHasAccess] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(false);
+
+  // Check if returned from Stripe with success
+  const successParam = searchParams.get("success");
+  const sessionIdParam = searchParams.get("session_id");
+  const canceledParam = searchParams.get("canceled");
 
   useEffect(() => {
     const getLead = async () => {
@@ -65,6 +76,8 @@ export default function QuotePage() {
       if (mockLead) {
         setLead(mockLead);
         setLoading(false);
+        // Check access for mock leads too
+        await checkAccess();
         return;
       }
 
@@ -77,9 +90,74 @@ export default function QuotePage() {
 
       if (data) setLead(data as Lead);
       setLoading(false);
+
+      // Check payment access
+      await checkAccess();
     };
     getLead();
   }, [leadId, supabase]);
+
+  const checkAccess = async () => {
+    setCheckingAccess(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setCheckingAccess(false); return; }
+
+    // If returned from successful Stripe checkout, verify and grant access
+    if (successParam === "true" && sessionIdParam) {
+      try {
+        const verifyRes = await fetch(`/api/contractor/verify-session?session_id=${sessionIdParam}&lead_id=${leadId}`);
+        const verifyData = await verifyRes.json();
+        if (verifyData.hasAccess) {
+          setHasAccess(true);
+          setCheckingAccess(false);
+          return;
+        }
+      } catch (e) {
+        console.error("Verify failed:", e);
+      }
+    }
+
+    // Check existing lead_access record
+    const { data: access } = await supabase
+      .from("lead_access")
+      .select("*")
+      .eq("lead_id", leadId)
+      .eq("contractor_id", user.id)
+      .eq("payment_status", "completed")
+      .single();
+
+    setHasAccess(!!access);
+    setCheckingAccess(false);
+  };
+
+  const handlePayment = async () => {
+    setPaymentError("");
+    setPaymentLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/contractor/login"); return; }
+
+      const res = await fetch("/api/contractor/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create checkout session");
+
+      if (data.already_paid) {
+        setHasAccess(true);
+        return;
+      }
+
+      // Redirect to Stripe
+      window.location.href = data.url;
+    } catch (err: any) {
+      setPaymentError(err.message || "Failed to start payment. Please try again.");
+      setPaymentLoading(false);
+    }
+  };
 
   const handleSubmitQuote = async ({ amount, notes, estimatedDate }: { amount: number; notes: string; estimatedDate: string }) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -105,7 +183,7 @@ export default function QuotePage() {
     router.push("/contractor/dashboard?tab=quotes");
   };
 
-  if (loading) {
+  if (loading || checkingAccess) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-pulse text-gray-400">Loading...</div>
@@ -124,6 +202,9 @@ export default function QuotePage() {
     );
   }
 
+  const showPaymentStep = !hasAccess && !successParam;
+  const showCanceledNotice = canceledParam === "true";
+
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-100 px-6 py-4">
@@ -136,45 +217,167 @@ export default function QuotePage() {
       </header>
 
       <div className="max-w-2xl mx-auto px-6 py-8">
-        {/* Lead Photo */}
-        {lead.photo_url && (
-          <img
-            src={lead.photo_url}
-            alt="Tree"
-            className="w-full h-64 object-cover rounded-2xl mb-6"
-          />
+        {/* Payment Access Step */}
+        {showPaymentStep && (
+          <>
+            {/* Lead Photo */}
+            {lead.photo_url && (
+              <img
+                src={lead.photo_url}
+                alt="Tree"
+                className="w-full h-64 object-cover rounded-2xl mb-6"
+              />
+            )}
+
+            {/* Lead Summary */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 capitalize mb-1">
+                  {lead.service_types.join(", ")}
+                </h1>
+                <p className="text-gray-500 flex items-center gap-1 text-sm">
+                  <MapPin size={14} /> {lead.address}
+                </p>
+                <p className="text-gray-400 flex items-center gap-1 text-xs mt-1">
+                  <Clock size={12} /> {new Date(lead.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Badge variant={lead.status === "new" ? "green" : "blue"}>{lead.status}</Badge>
+            </div>
+
+            {/* AI Analysis */}
+            {lead.analysis_data && (
+              <div className="mb-6">
+                <AnalysisDisplay data={lead.analysis_data} />
+              </div>
+            )}
+
+            {/* Payment Card */}
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <CreditCard className="text-green-600" size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Lead Access Payment</h2>
+                  <p className="text-sm text-gray-500">One-time payment to unlock this lead</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-amber-900">Access this lead</p>
+                    <p className="text-sm text-amber-700">Reveal contact info & submit your quote</p>
+                  </div>
+                  <span className="text-2xl font-bold text-amber-900">${(LEAD_PRICE_CENTS / 100).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                <li className="flex items-center gap-2"><CheckCircle size={16} className="text-green-500" /> View customer contact info</li>
+                <li className="flex items-center gap-2"><CheckCircle size={16} className="text-green-500" /> Submit your quote directly</li>
+                <li className="flex items-center gap-2"><CheckCircle size={16} className="text-green-500" /> 24-hour access to contact customer</li>
+              </ul>
+
+              {showCanceledNotice && (
+                <div className="bg-gray-100 border border-gray-200 rounded-xl p-3 mb-4 text-sm text-gray-600">
+                  Payment was canceled. Click below to try again.
+                </div>
+              )}
+
+              {paymentError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-600">
+                  {paymentError}
+                </div>
+              )}
+
+              <Button
+                onClick={handlePayment}
+                disabled={paymentLoading}
+                className="w-full"
+                size="lg"
+              >
+                {paymentLoading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin">⏳</span> Redirecting to Stripe...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <CreditCard size={18} />
+                    Pay ${(LEAD_PRICE_CENTS / 100).toFixed(2)} with Stripe
+                  </span>
+                )}
+              </Button>
+
+              <p className="text-xs text-gray-400 text-center mt-3">
+                Secure payment via Stripe. You&apos;ll be redirected to complete your payment.
+              </p>
+            </Card>
+          </>
         )}
 
-        {/* Lead Summary */}
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 capitalize mb-1">
-              {lead.service_types.join(", ")}
-            </h1>
-            <p className="text-gray-500 flex items-center gap-1 text-sm">
-              <MapPin size={14} /> {lead.address}
-            </p>
-            <p className="text-gray-400 flex items-center gap-1 text-xs mt-1">
-              <Clock size={12} /> {new Date(lead.created_at).toLocaleDateString()}
-            </p>
-          </div>
-          <Badge variant={lead.status === "new" ? "green" : "blue"}>{lead.status}</Badge>
-        </div>
+        {/* Quote Form (after payment) */}
+        {(hasAccess || successParam === "true") && (
+          <>
+            {/* Success Banner */}
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+              <CheckCircle className="text-green-600" size={20} />
+              <div>
+                <p className="font-semibold text-green-800">Payment successful!</p>
+                <p className="text-sm text-green-600">You now have access to submit a quote for this lead.</p>
+              </div>
+            </div>
 
-        {/* AI Analysis */}
-        {lead.analysis_data && (
-          <div className="mb-6">
-            <AnalysisDisplay data={lead.analysis_data} />
-          </div>
+            {/* Lead Photo */}
+            {lead.photo_url && (
+              <img
+                src={lead.photo_url}
+                alt="Tree"
+                className="w-full h-64 object-cover rounded-2xl mb-6"
+              />
+            )}
+
+            {/* Lead Summary */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 capitalize mb-1">
+                  {lead.service_types.join(", ")}
+                </h1>
+                <p className="text-gray-500 flex items-center gap-1 text-sm">
+                  <MapPin size={14} /> {lead.address}
+                </p>
+                <p className="text-gray-400 flex items-center gap-1 text-xs mt-1">
+                  <Clock size={12} /> {new Date(lead.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Badge variant={lead.status === "new" ? "green" : "blue"}>{lead.status}</Badge>
+            </div>
+
+            {/* AI Analysis */}
+            {lead.analysis_data && (
+              <div className="mb-6">
+                <AnalysisDisplay data={lead.analysis_data} />
+              </div>
+            )}
+
+            {/* Quote Form */}
+            <QuoteForm
+              lead={lead}
+              onSubmit={handleSubmitQuote}
+              priceCents={LEAD_PRICE_CENTS}
+            />
+          </>
         )}
-
-        {/* Quote Form */}
-        <QuoteForm
-          lead={lead}
-          onSubmit={handleSubmitQuote}
-          priceCents={LEAD_PRICE_CENTS}
-        />
       </div>
     </main>
+  );
+}
+
+export default function QuotePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">Loading...</div>}>
+      <QuotePageContent />
+    </Suspense>
   );
 }

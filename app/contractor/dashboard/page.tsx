@@ -32,6 +32,7 @@ const MOCK_LEADS: Lead[] = [
     google_maps_verified: true,
     status: "new",
     created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    estimated_price: { low: 1275, high: 1950, currency: "USD", priceFactors: ["Large Oak, 30-40ft", "Clear access from driveway"] },
   },
   {
     id: "mock-002",
@@ -119,47 +120,79 @@ const MOCK_LEADS: Lead[] = [
   },
 ];
 
+// Mock quotes for demo mode
+const MOCK_QUOTES: Quote[] = [
+  {
+    id: "q-mock-001",
+    lead_id: "mock-001",
+    contractor_id: "demo-contractor",
+    amount: 1800,
+    notes: "Standard removal with chipping. Includes stump grinding for $200 extra if needed.",
+    estimated_date: "2026-04-20",
+    status: "pending",
+    created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "q-mock-002",
+    lead_id: "mock-003",
+    contractor_id: "demo-contractor",
+    amount: 350,
+    notes: "Palm cleaning — standard service. Remove all dead fronds and fruit.",
+    estimated_date: "2026-04-18",
+    status: "accepted",
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
 type Tab = "leads" | "quotes" | "account";
 
 export default function ContractorDashboardPage() {
   const supabase = createClient();
   const [tab, setTab] = useState<Tab>("leads");
   const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>(MOCK_QUOTES);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ email?: string; business_name?: string } | null>(null);
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        window.location.href = "/contractor/login";
-        return;
-      }
-      setUser({ email: authUser.email });
+      // Check for demo mode cookie
+      const isDemo = document.cookie.includes("treequote_demo=contractor");
 
-      // Fetch real leads from Supabase
-      const { data: realLeads } = await supabase
-        .from("leads")
-        .select("*, customer:customers(*)")
-        .order("created_at", { ascending: false })
-        .limit(20);
+      if (!isDemo) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
+          window.location.href = "/contractor/login";
+          return;
+        }
+        setUser({ email: authUser.email });
 
-      if (realLeads && realLeads.length > 0) {
-        setLeads(realLeads as Lead[]);
+        // Fetch real leads from Supabase
+        const { data: realLeads } = await supabase
+          .from("leads")
+          .select("*, customer:customers(*)")
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        if (realLeads && realLeads.length > 0) {
+          setLeads(realLeads as Lead[]);
+        }
+
+        // Fetch quotes
+        const { data: realQuotes } = await supabase
+          .from("quotes")
+          .select("*, lead:leads(*)")
+          .eq("contractor_id", authUser.id)
+          .order("created_at", { ascending: false });
+
+        if (realQuotes) {
+          setQuotes(realQuotes as Quote[]);
+        }
+      } else {
+        // Demo mode: use mock user, mock leads, and mock quotes
+        setUser({ email: "demo@treequote.com", business_name: "🌲 Atlanta Tree Pro (Demo)" });
       }
       setLoading(false);
-
-      // Fetch quotes
-      const { data: realQuotes } = await supabase
-        .from("quotes")
-        .select("*, lead:leads(*)")
-        .eq("contractor_id", authUser.id)
-        .order("created_at", { ascending: false });
-
-      if (realQuotes) {
-        setQuotes(realQuotes as Quote[]);
-      }
     };
     getUser();
   }, [supabase]);
