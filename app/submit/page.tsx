@@ -9,15 +9,15 @@ import { LocationInput } from "@/components/LocationInput";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
-import { ArrowLeft, ArrowRight, CheckCircle, Loader2 } from "lucide-react";
-import { v4 as uuidv4 } from "uuid";
+import { ArrowLeft, ArrowRight, CheckCircle, Loader2, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 const STEPS = ["Photo", "Service", "Location", "Contact", "Review"];
 
 export default function SubmitPage() {
   const router = useRouter();
   const supabase = createClient();
-
+  const { resolvedTheme, setTheme } = useTheme();
   const [step, setStep] = useState(0);
   const [photoUrl, setPhotoUrl] = useState("");
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
@@ -73,7 +73,24 @@ export default function SubmitPage() {
         // Analysis is non-critical; lead is still created
       }
 
-      // 4. Redirect to confirmation
+      // 4. Send confirmation email (non-critical)
+      if (customer.email) {
+        try {
+          await fetch("/api/customers/confirm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: customer.email,
+              customerName: customer.name,
+              leadId: lead.id,
+              serviceTypes,
+              address,
+            }),
+          });
+        } catch { /* email failure is non-critical */ }
+      }
+
+      // 5. Redirect to confirmation
       router.push(`/submitted?leadId=${lead.id}`);
     } catch (err) {
       console.error("Submit error:", err);
@@ -84,16 +101,22 @@ export default function SubmitPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-6 py-4">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-700">
+          <Link href="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 dark:text-gray-300">
             <ArrowLeft size={20} />
             <span className="font-medium">Back</span>
           </Link>
-          <span className="font-bold text-lg text-gray-900">🌳 TreeQuote</span>
-          <div className="w-16" />
+          <span className="font-bold text-lg text-gray-900 dark:text-white">🌳 TreeQuote</span>
+          <button
+            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Toggle theme"
+          >
+            {resolvedTheme === "dark" ? <Sun size={18} className="text-gray-400" /> : <Moon size={18} className="text-gray-500" />}
+          </button>
         </div>
       </header>
 

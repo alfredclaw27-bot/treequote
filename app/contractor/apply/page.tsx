@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { SERVICE_TYPES } from "@/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, Building2, MapPin, Phone, Mail, ArrowRight, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 export default function ContractorApplyPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { resolvedTheme, setTheme } = useTheme();
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -38,7 +40,6 @@ export default function ContractorApplyPage() {
     setError("");
 
     try {
-      // Sign up via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
@@ -47,7 +48,6 @@ export default function ContractorApplyPage() {
       if (authError) throw authError;
       if (!authData.user) throw new Error("No user returned");
 
-      // Insert contractor record (approved: false)
       const { error: contractorError } = await supabase.from("contractors").insert({
         id: authData.user.id,
         email: form.email,
@@ -60,8 +60,17 @@ export default function ContractorApplyPage() {
 
       if (contractorError) throw contractorError;
 
-      alert("Application submitted! We'll review and get back to you within 24 hours.");
-      router.push("/contractor/login");
+      try {
+        await fetch("/api/contractors/welcome", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: form.email, businessName: form.businessName }),
+        });
+      } catch {
+        // Email failure is non-critical
+      }
+
+      router.push("/contractor/pending");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong.";
       setError(message);
@@ -71,24 +80,35 @@ export default function ContractorApplyPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-100 px-6 py-4">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-6 py-4">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm font-medium">
+          <Link href="/" className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm font-medium">
             ← Back
           </Link>
-          <span className="font-bold text-lg text-gray-900">🌳 TreeQuote</span>
-          <div className="w-16" />
+          <span className="font-bold text-lg text-gray-900 dark:text-white">🌳 TreeQuote</span>
+          <button
+            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            aria-label="Toggle theme"
+          >
+            {resolvedTheme === "dark" ? <Sun size={18} className="text-gray-400" /> : <Moon size={18} className="text-gray-500" />}
+          </button>
         </div>
       </header>
 
       <div className="max-w-lg mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Contractor Application</h1>
-        <p className="text-gray-500 text-sm mb-8">
-          Apply to join our network. We review applications within 24 hours.
-        </p>
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-full text-sm font-medium mb-3">
+            <Building2 size={14} /> For Contractors
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Join the Network</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            Apply to start receiving qualified tree service leads in your area. Review within 24 hours.
+          </p>
+        </div>
 
-        <Card className="p-6">
+        <Card className="p-6 dark:bg-gray-800 dark:border-gray-700">
           <form onSubmit={handleApply} className="space-y-5">
             <Input
               id="businessName"
@@ -113,26 +133,35 @@ export default function ContractorApplyPage() {
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="Create a password"
+              placeholder="Create a secure password"
               required
             />
-            <Input
-              id="phone"
-              label="Phone"
-              type="tel"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              placeholder="(404) 555-0100"
-            />
-            <Input
-              id="serviceArea"
-              label="Service Area"
-              value={form.serviceArea}
-              onChange={(e) => setForm({ ...form, serviceArea: e.target.value })}
-              placeholder="Atlanta, GA · Marietta, GA · Roswell, GA"
-            />
+            <div className="relative">
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} style={{ top: "calc(50% + 4px)" }} />
+              <Input
+                id="phone"
+                label="Phone"
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="(404) 555-0100"
+                className="pl-11"
+              />
+            </div>
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Specialties</p>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                <MapPin size={16} className="text-gray-400" /> Service Area
+              </label>
+              <Input
+                id="serviceArea"
+                value={form.serviceArea}
+                onChange={(e) => setForm({ ...form, serviceArea: e.target.value })}
+                placeholder="Atlanta, GA · Marietta, GA · Roswell, GA"
+              />
+              <p className="text-xs text-gray-400 mt-1.5">Comma-separated list of cities or zip codes you serve</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Specialties</p>
               <div className="flex flex-wrap gap-2">
                 {SERVICE_TYPES.map(({ id, label, icon }) => (
                   <button
@@ -141,8 +170,8 @@ export default function ContractorApplyPage() {
                     onClick={() => toggleSpecialty(id)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                       form.specialties.includes(id)
-                        ? "bg-green-100 border-green-300 text-green-700"
-                        : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                        ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/40 dark:border-green-700 dark:text-green-300"
+                        : "bg-white border-gray-200 text-gray-600 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
                     }`}
                   >
                     {icon} {label}
@@ -151,14 +180,32 @@ export default function ContractorApplyPage() {
               </div>
             </div>
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-sm">
+              <p className="font-semibold text-amber-800 dark:text-amber-200 mb-1">What happens after you apply?</p>
+              <ul className="space-y-1 text-amber-700 dark:text-amber-300">
+                <li>✓ We review your application (within 24 hours)</li>
+                <li>✓ You receive an email when approved</li>
+                <li>✓ Log in and start receiving leads!</li>
+              </ul>
+            </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            {error && (
+              <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-2">{error}</p>
+            )}
+
+            <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600" disabled={loading}>
               {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
               {loading ? "Submitting..." : "Submit Application"}
             </Button>
           </form>
         </Card>
+
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500 mt-6">
+          Already have an account?{" "}
+          <Link href="/contractor/login" className="text-green-600 dark:text-green-400 font-medium hover:underline">
+            Sign in
+          </Link>
+        </p>
       </div>
     </main>
   );
