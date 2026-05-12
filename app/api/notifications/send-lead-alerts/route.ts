@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   // Record notifications sent in the lead record
   await supabase
-    .from("leads")
+    .from("tq_leads")
     .update({
       notifications_sent: result.sent,
       notification_targets: result.contractors,

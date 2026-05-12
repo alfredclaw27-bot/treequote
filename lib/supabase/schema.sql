@@ -1,13 +1,10 @@
 -- =============================================
--- Tree Service Lead Gen — Supabase Schema
--- Run this in your Supabase SQL Editor
+-- TreeQuote — Supabase Schema (prefixed tq_*)
+-- Run via Supabase Dashboard SQL Editor
 -- =============================================
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Customers
-CREATE TABLE IF NOT EXISTS customers (
+CREATE TABLE IF NOT EXISTS tq_customers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   email TEXT,
@@ -16,14 +13,14 @@ CREATE TABLE IF NOT EXISTS customers (
 );
 
 -- Leads
-CREATE TABLE IF NOT EXISTS leads (
+CREATE TABLE IF NOT EXISTS tq_leads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
-  photo_url TEXT NOT NULL,
+  customer_id UUID REFERENCES tq_customers(id) ON DELETE SET NULL,
+  photo_url TEXT NOT NULL DEFAULT '',
   analysis_data JSONB,
-  estimated_price JSONB,  -- {low, high, currency, priceFactors[]}
+  estimated_price JSONB,
   service_types TEXT[] NOT NULL DEFAULT '{}',
-  address TEXT NOT NULL,
+  address TEXT NOT NULL DEFAULT '',
   latitude DECIMAL(10, 8),
   longitude DECIMAL(11, 8),
   google_maps_verified BOOLEAN DEFAULT false,
@@ -35,24 +32,25 @@ CREATE TABLE IF NOT EXISTS leads (
 );
 
 -- Contractors
-CREATE TABLE IF NOT EXISTS contractors (
+CREATE TABLE IF NOT EXISTS tq_contractors (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL DEFAULT '',
   business_name TEXT NOT NULL,
   phone TEXT,
   service_area TEXT[] DEFAULT '{}',
   specialties TEXT[] DEFAULT '{}',
   approved BOOLEAN DEFAULT false,
   stripe_customer_id TEXT,
-  equipment JSONB DEFAULT '{}',  -- {bucketReach, crewSize, equipment: []}
+  equipment JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- Quotes
-CREATE TABLE IF NOT EXISTS quotes (
+CREATE TABLE IF NOT EXISTS tq_quotes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
-  contractor_id UUID REFERENCES contractors(id) ON DELETE SET NULL,
+  lead_id UUID REFERENCES tq_leads(id) ON DELETE SET NULL,
+  contractor_id UUID REFERENCES tq_contractors(id) ON DELETE SET NULL,
   amount DECIMAL(10, 2) NOT NULL,
   notes TEXT,
   estimated_date DATE,
@@ -61,49 +59,33 @@ CREATE TABLE IF NOT EXISTS quotes (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Lead Access (tracks which contractors paid to view which leads)
-CREATE TABLE IF NOT EXISTS lead_access (
+-- Lead Access (tracks which contractors paid for which leads)
+CREATE TABLE IF NOT EXISTS tq_lead_access (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
-  contractor_id UUID REFERENCES contractors(id) ON DELETE SET NULL,
+  lead_id UUID REFERENCES tq_leads(id) ON DELETE SET NULL,
+  contractor_id UUID REFERENCES tq_contractors(id) ON DELETE SET NULL,
   paid BOOLEAN DEFAULT false,
   stripe_payment_id TEXT,
   accessed_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(lead_id, contractor_id)
 );
 
--- Row Level Security
-ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
-ALTER TABLE contractors ENABLE ROW LEVEL SECURITY;
-ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
+-- RLS
+ALTER TABLE tq_customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tq_leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tq_contractors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tq_quotes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tq_lead_access ENABLE ROW LEVEL SECURITY;
 
--- Customers: anyone can create, read own records
-CREATE POLICY "Customers: anyone can insert" ON customers FOR INSERT WITH CHECK (true);
-CREATE POLICY "Customers: anyone can read" ON customers FOR SELECT USING (true);
-
--- Leads: anyone can create (customer submit), contractors can read quoted ones, admins can read all
-CREATE POLICY "Leads: anyone can insert" ON leads FOR INSERT WITH CHECK (true);
-CREATE POLICY "Leads: public read (no auth needed for MVP)" ON leads FOR SELECT USING (true);
-CREATE POLICY "Leads: anyone can update" ON leads FOR UPDATE USING (true);
-
--- Contractors: anyone can apply (insert), only admin can read all
-CREATE POLICY "Contractors: anyone can insert" ON contractors FOR INSERT WITH CHECK (true);
-CREATE POLICY "Contractors: public read" ON contractors FOR SELECT USING (true);
-CREATE POLICY "Contractors: anyone can update own" ON contractors FOR UPDATE USING (true);
-
--- Quotes: anyone can insert (contractor), customers can read their own lead quotes
-CREATE POLICY "Quotes: anyone can insert" ON quotes FOR INSERT WITH CHECK (true);
-CREATE POLICY "Quotes: public read" ON quotes FOR SELECT USING (true);
-CREATE POLICY "Quotes: anyone can update" ON quotes FOR UPDATE USING (true);
+-- Relax RLS for MVP (full public access)
+CREATE POLICY "public_read_write" ON tq_customers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "public_read_write" ON tq_leads FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "public_read_write" ON tq_contractors FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "public_read_write" ON tq_quotes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "public_read_write" ON tq_lead_access FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================
 -- Storage Bucket
--- =============================================
 -- Run in Supabase Dashboard > Storage > New Bucket
--- Name: tree-photos
--- Public: true
--- 
--- Also add this storage policy:
--- CREATE POLICY "tree-photos: public read" ON storage.objects FOR SELECT USING (bucket_id = 'tree-photos');
--- CREATE POLICY "tree-photos: authenticated upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'tree-photos');
+-- Name: tree-photos — Public: true
+-- =============================================

@@ -156,8 +156,8 @@ export default function ContractorDashboardPage() {
 
   useEffect(() => {
     const getUser = async () => {
-      // Check for demo mode cookie
-      const isDemo = document.cookie.includes("treequote_demo=contractor");
+      // Check for demo mode via localStorage
+      const isDemo = typeof window !== "undefined" && localStorage.getItem("treequote_demo") === "contractor";
 
       if (!isDemo) {
         const { data: { user: authUser } } = await supabase.auth.getUser();

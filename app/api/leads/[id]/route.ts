@@ -6,8 +6,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const supabase = await createServiceClient();
 
   const { data, error } = await supabase
-    .from("leads")
-    .select("*, customer:customers(*)")
+    .from("tq_leads")
+    .select("*, customer:tq_customers(*)")
     .eq("id", id)
     .single();
 

@@ -34,9 +34,9 @@ export default function ContractorLoginPage() {
 
   const handleDemoLogin = async () => {
     setDemoLoading(true);
-    // Demo mode: set a mock auth cookie and redirect to dashboard
-    // The dashboard will show mock leads so the full flow is testable
-    document.cookie = `treequote_demo=contractor; path=/; max-age=86400; samesite=lax`;
+    // Demo mode: store in localStorage and redirect
+    localStorage.setItem("treequote_demo", "contractor");
+    localStorage.setItem("treequote_demo_name", "🌲 Atlanta Tree Pro (Demo)");
     router.push("/contractor/dashboard?demo=true");
   };
 
