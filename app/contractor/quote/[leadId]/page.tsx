@@ -83,8 +83,8 @@ function QuotePageContent() {
 
       // Try real Supabase
       const { data } = await supabase
-        .from("leads")
-        .select("*, customer:customers(*)")
+        .from("tq_leads")
+        .select("*, customer:tq_customers(*)")
         .eq("id", leadId)
         .single();
 
@@ -119,11 +119,10 @@ function QuotePageContent() {
 
     // Check existing lead_access record
     const { data: access } = await supabase
-      .from("lead_access")
+      .from("tq_lead_access")
       .select("*")
       .eq("lead_id", leadId)
       .eq("contractor_id", user.id)
-      .eq("payment_status", "completed")
       .single();
 
     setHasAccess(!!access);
@@ -166,7 +165,7 @@ function QuotePageContent() {
       return;
     }
 
-    const { error } = await supabase.from("quotes").insert({
+    const { error } = await supabase.from("tq_quotes").insert({
       lead_id: leadId,
       contractor_id: user.id,
       amount,
@@ -178,7 +177,7 @@ function QuotePageContent() {
     if (error) throw error;
 
     // Update lead status
-    await supabase.from("leads").update({ status: "quoted" }).eq("id", leadId);
+    await supabase.from("tq_leads").update({ status: "quoted" }).eq("id", leadId);
 
     router.push("/contractor/dashboard?tab=quotes");
   };

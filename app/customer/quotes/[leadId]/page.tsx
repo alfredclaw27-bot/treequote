@@ -21,8 +21,8 @@ export default function CustomerQuotesPage() {
   useEffect(() => {
     const load = async () => {
       const { data: leadData } = await supabase
-        .from("leads")
-        .select("*, customer:customers(*)")
+        .from("tq_leads")
+        .select("*, customer:tq_customers(*)")
         .eq("id", leadId)
         .single();
 
@@ -30,8 +30,8 @@ export default function CustomerQuotesPage() {
         setLead(leadData as Lead);
 
         const { data: quotesData } = await supabase
-          .from("quotes")
-          .select("*, contractor:contractors(*)")
+          .from("tq_quotes")
+          .select("*, contractor:tq_contractors(*)")
           .eq("lead_id", leadId)
           .order("amount", { ascending: true });
 
@@ -43,7 +43,7 @@ export default function CustomerQuotesPage() {
   }, [leadId, supabase]);
 
   const handleAccept = async (quoteId: string) => {
-    await supabase.from("quotes").update({ status: "accepted" }).eq("id", quoteId);
+    await supabase.from("tq_quotes").update({ status: "accepted" }).eq("id", quoteId);
     setQuotes((qs) => qs.map((q) => q.id === quoteId ? { ...q, status: "accepted" as const } : q));
   };
 

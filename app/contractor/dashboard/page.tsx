@@ -169,7 +169,7 @@ export default function ContractorDashboardPage() {
 
         // Fetch real leads from Supabase
         const { data: realLeads } = await supabase
-          .from("leads")
+          .from("tq_leads")
           .select("*, customer:customers(*)")
           .order("created_at", { ascending: false })
           .limit(20);
@@ -180,7 +180,7 @@ export default function ContractorDashboardPage() {
 
         // Fetch quotes
         const { data: realQuotes } = await supabase
-          .from("quotes")
+          .from("tq_quotes")
           .select("*, lead:leads(*)")
           .eq("contractor_id", authUser.id)
           .order("created_at", { ascending: false });

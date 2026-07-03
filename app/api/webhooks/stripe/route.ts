@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       // Update lead as paid
       if (leadId) {
         await supabase
-          .from("leads")
+          .from("tq_leads")
           .update({ stripe_payment_id: paymentIntent.id })
           .eq("id", leadId);
       }
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       // Store payment on quote if exists
       if (leadId && contractorId) {
         await supabase
-          .from("quotes")
+          .from("tq_quotes")
           .update({ stripe_payment_id: paymentIntent.id })
           .eq("lead_id", leadId)
           .eq("contractor_id", contractorId);

@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const { data, error } = await supabase
-    .from("quotes")
+    .from("tq_quotes")
     .insert({
       lead_id: leadId,
       contractor_id,
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Update lead status to quoted
-  await supabase.from("leads").update({ status: "quoted" }).eq("id", leadId);
+  await supabase.from("tq_leads").update({ status: "quoted" }).eq("id", leadId);
 
   return NextResponse.json(data, { status: 201 });
 }

@@ -48,7 +48,7 @@ export default function ContractorApplyPage() {
       if (authError) throw authError;
       if (!authData.user) throw new Error("No user returned");
 
-      const { error: contractorError } = await supabase.from("contractors").insert({
+      const { error: contractorError } = await supabase.from("tq_contractors").insert({
         id: authData.user.id,
         email: form.email,
         business_name: form.businessName,

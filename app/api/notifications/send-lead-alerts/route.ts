@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   // Fetch the lead
   const { data: lead, error: leadError } = await supabase
-    .from("leads")
+    .from("tq_leads")
     .select("*")
     .eq("id", leadId)
     .single();
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
   const supabase = await createServiceClient();
 
   const { data: lead, error: leadError } = await supabase
-    .from("leads")
+    .from("tq_leads")
     .select("*")
     .eq("id", leadId)
     .single();

@@ -19,9 +19,9 @@ export default function AdminPage() {
   useEffect(() => {
     const load = async () => {
       const [leadsRes, contractorsRes, quotesRes] = await Promise.all([
-        supabase.from("leads").select("*, customer:customers(*)").order("created_at", { ascending: false }),
-        supabase.from("contractors").select("*").order("created_at", { ascending: false }),
-        supabase.from("quotes").select("*, lead:leads(*), contractor:contractors(*)").order("created_at", { ascending: false }),
+        supabase.from("tq_leads").select("*, customer:customers(*)").order("created_at", { ascending: false }),
+        supabase.from("tq_contractors").select("*").order("created_at", { ascending: false }),
+        supabase.from("tq_quotes").select("*, lead:leads(*), contractor:contractors(*)").order("created_at", { ascending: false }),
       ]);
 
       if (leadsRes.data) setLeads(leadsRes.data as Lead[]);
@@ -33,12 +33,12 @@ export default function AdminPage() {
   }, [supabase]);
 
   const toggleContractorApproval = async (id: string, approved: boolean) => {
-    await supabase.from("contractors").update({ approved }).eq("id", id);
+    await supabase.from("tq_contractors").update({ approved }).eq("id", id);
     setContractors((cs) => cs.map((c) => (c.id === id ? { ...c, approved } : c)));
   };
 
   const updateLeadStatus = async (id: string, status: string) => {
-    await supabase.from("leads").update({ status }).eq("id", id);
+    await supabase.from("tq_leads").update({ status }).eq("id", id);
     setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: status as Lead["status"] } : l)));
   };
 

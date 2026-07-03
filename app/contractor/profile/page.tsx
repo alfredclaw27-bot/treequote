@@ -52,7 +52,7 @@ export default function ContractorProfilePage() {
       if (!user) { router.push("/contractor/login"); return; }
 
       const { data: contractor } = await supabase
-        .from("contractors")
+        .from("tq_contractors")
         .select("*")
         .eq("id", user.id)
         .single();
@@ -85,7 +85,7 @@ export default function ContractorProfilePage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { error } = await supabase.from("contractors").update({
+    const { error } = await supabase.from("tq_contractors").update({
       business_name: businessName,
       phone: phone || null,
       service_area: serviceArea.split(",").map((s) => s.trim()).filter(Boolean),

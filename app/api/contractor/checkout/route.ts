@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     // Check if this contractor already paid for this lead
     const { data: existingAccess } = await supabase
-      .from("lead_access")
+      .from("tq_lead_access")
       .select("*")
       .eq("lead_id", leadId)
       .eq("contractor_id", user.id)
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Record pending lead access
-    await supabase.from("lead_access").insert({
+    await supabase.from("tq_lead_access").insert({
       lead_id: leadId,
       contractor_id: user.id,
       stripe_session_id: session.id,

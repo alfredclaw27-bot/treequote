@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     // Update lead_access record to completed
     const { error } = await supabase
-      .from("lead_access")
+      .from("tq_lead_access")
       .update({
         payment_status: "completed",
         stripe_payment_id: session.payment_intent as string,

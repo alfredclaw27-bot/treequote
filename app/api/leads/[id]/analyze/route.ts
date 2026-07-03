@@ -9,7 +9,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Get the lead with service types
   const { data: lead, error: leadError } = await supabase
-    .from("leads")
+    .from("tq_leads")
     .select("photo_url, service_types")
     .eq("id", id)
     .single();
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       estimatedJobComplexity: "undetermined" as const,
     };
     const stubPrice = { low: 0, high: 0, currency: "USD" as const, priceFactors: ["Configure OPENAI_API_KEY to enable analysis"] };
-    await supabase.from("leads").update({ analysis_data: stubAnalysis, estimated_price: stubPrice }).eq("id", id);
+    await supabase.from("tq_leads").update({ analysis_data: stubAnalysis, estimated_price: stubPrice }).eq("id", id);
     return NextResponse.json({ analysis: stubAnalysis, estimatedPrice: stubPrice, stub: true });
   }
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Use actual service types from the lead for price estimation
     const accuratePrice = generatePriceEstimate(analysis, lead.service_types);
 
-    await supabase.from("leads").update({
+    await supabase.from("tq_leads").update({
       analysis_data: analysis,
       estimated_price: accuratePrice,
     }).eq("id", id);

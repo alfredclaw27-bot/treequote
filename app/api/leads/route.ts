@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 export async function GET() {
   const supabase = await createServiceClient();
   const { data, error } = await supabase
-    .from("leads")
+    .from("tq_leads")
     .select("*, customer:customers(*)")
     .order("created_at", { ascending: false })
     .limit(50);
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   let customerId = customer_id;
   if (!customerId) {
     const { data: customer, error: customerError } = await supabase
-      .from("customers")
+      .from("tq_customers")
       .insert({ name: "Customer", email: null, phone: null })
       .select("id")
       .single();
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: lead, error: leadError } = await supabase
-    .from("leads")
+    .from("tq_leads")
     .insert({
       customer_id: customerId,
       photo_url,

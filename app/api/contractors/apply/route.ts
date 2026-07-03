@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
   // Check if email already exists
   const { data: existing } = await supabase
-    .from("contractors")
+    .from("tq_contractors")
     .select("id")
     .eq("email", email)
     .single();

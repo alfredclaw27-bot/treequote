@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const contractorId = searchParams.get("contractor_id");
 
   let query = supabase
-    .from("quotes")
+    .from("tq_quotes")
     .select("*, lead:leads(*), contractor:contractors(*)")
     .order("created_at", { ascending: false });
 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from("quotes")
+    .from("tq_quotes")
     .insert({
       lead_id,
       contractor_id,
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Update lead status
-  await supabase.from("leads").update({ status: "quoted" }).eq("id", lead_id);
+  await supabase.from("tq_leads").update({ status: "quoted" }).eq("id", lead_id);
 
   return NextResponse.json(data, { status: 201 });
 }
