@@ -173,20 +173,20 @@ export function PhotoUploader({ onUploaded, currentUrls = [] }: PhotoUploaderPro
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => { void addFiles(inputRef.current?.files ?? null); }}
           className={`w-full border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer transition-all py-14 ${dragging ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-green-400 hover:bg-gray-50"}`}
         >
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+              onClick={(e) => { e.stopPropagation(); void addFiles(inputRef.current?.files ?? null); }}
               className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700"
             >
               <Upload size={16} /> Browse Photos
             </button>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+              onClick={(e) => { e.stopPropagation(); void addFiles(inputRef.current?.files ?? null); }}
               className="flex items-center gap-2 px-5 py-2.5 border-2 border-green-600 text-green-700 rounded-xl text-sm font-semibold hover:bg-green-50"
             >
               <Camera size={16} /> Take New
