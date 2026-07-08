@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing session_id or lead_id" }, { status: 400 });
     }
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -25,12 +25,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Payment not completed" }, { status: 400 });
     }
 
-    // Update lead_access record to completed
-    const { error } = await supabase
+    const service = await createServiceClient();
+    const { error } = await service
       .from("tq_lead_access")
       .update({
         payment_status: "completed",
         stripe_payment_id: session.payment_intent as string,
+        unlock_method: "stripe",
       })
       .eq("stripe_session_id", sessionId)
       .eq("contractor_id", user.id);

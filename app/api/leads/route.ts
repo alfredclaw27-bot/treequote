@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { siteConfig } from "@/config/site";
 
 export async function GET() {
   const supabase = await createServiceClient();
   const { data, error } = await supabase
     .from("tq_leads")
-    .select("*, customer:customers(*)")
+    .select("*, customer:tq_customers(*)")
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -54,12 +55,14 @@ export async function POST(req: NextRequest) {
 
   if (leadError) return NextResponse.json({ error: leadError.message }, { status: 500 });
 
-  // Trigger AI analysis and contractor notifications in the background
-  // (fire-and-forget — don't block the response)
+  // Trigger contractor notifications (and AI analysis, if enabled) in the
+  // background — fire-and-forget, don't block the response.
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  fetch(`${baseUrl}/api/leads/${lead.id}/analyze`, { method: "POST" }).catch((e) =>
-    console.error("[LeadCreated] AI analysis trigger failed:", e)
-  );
+  if (siteConfig.features.aiAnalysis) {
+    fetch(`${baseUrl}/api/leads/${lead.id}/analyze`, { method: "POST" }).catch((e) =>
+      console.error("[LeadCreated] AI analysis trigger failed:", e)
+    );
+  }
   fetch(`${baseUrl}/api/notifications/send-lead-alerts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

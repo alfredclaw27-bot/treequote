@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from("tq_quotes")
-    .select("*, lead:leads(*), contractor:contractors(*)")
+    .select("*, lead:tq_leads(*), contractor:tq_contractors(*)")
     .order("created_at", { ascending: false });
 
   if (contractorId) {
