@@ -22,7 +22,7 @@ test.describe("Contractor Portal", () => {
     await page.goto("/contractor/apply");
     await expect(page).toHaveURL("/contractor/apply");
     await expect(page.locator("h1")).toContainText("Contractor Application");
-    await expect(page.locator("input[placeholder*='ABC Tree']")).toBeVisible(); // business name
+    await expect(page.locator("input[placeholder*='ABC Services']")).toBeVisible();
     await expect(page.locator("input[type='email']")).toBeVisible();
     await expect(page.locator("input[type='password']")).toBeVisible();
     await expect(page.locator("input[type='tel']")).toBeVisible();
@@ -31,23 +31,28 @@ test.describe("Contractor Portal", () => {
 
   test("apply page should toggle specialty selections", async ({ page }) => {
     await page.goto("/contractor/apply");
-    // Click on Tree Removal specialty
     const removalBtn = page.locator("button:has-text('Tree Removal')");
     await removalBtn.click();
-    await expect(removalBtn).toHaveClass(/bg-green-100/);
+    await expect(removalBtn).toHaveClass(/bg-primary/);
     await removalBtn.click();
-    await expect(removalBtn).not.toHaveClass(/bg-green-100/);
+    await expect(removalBtn).not.toHaveClass(/bg-primary/);
   });
 
   test("dashboard should redirect to login when unauthenticated", async ({ page }) => {
     await page.goto("/contractor/dashboard");
-    // Should redirect to login
     await expect(page).toHaveURL(/\/contractor\/login/);
   });
 
-  test("profile page should load with equipment form", async ({ page }) => {
+  test("profile page should redirect to login when unauthenticated", async ({ page }) => {
     await page.goto("/contractor/profile");
-    // Should redirect to login when unauthenticated
     await expect(page).toHaveURL(/\/contractor\/login/);
+  });
+
+  test("demo mode should unlock the full dashboard without Supabase", async ({ page }) => {
+    await page.goto("/contractor/login");
+    await page.click("text=Explore Demo Account");
+    await expect(page).toHaveURL(/\/contractor\/dashboard/);
+    await expect(page.locator("text=Demo mode")).toBeVisible();
+    await expect(page.locator("text=Available Leads")).toBeVisible();
   });
 });
