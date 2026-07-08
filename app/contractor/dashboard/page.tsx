@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { LeadCard } from "@/components/LeadCard";
 import { siteConfig } from "@/config/site";
 import { MOCK_LEADS, MOCK_QUOTES } from "@/lib/mock-data";
-import { isDemoMode, getDemoUnlockedLeadIds, getDemoCredits, exitDemoMode } from "@/lib/demo";
+import { isDemoMode, getDemoUnlockedLeadIds, getDemoCredits, getDemoQuotes, exitDemoMode } from "@/lib/demo";
 import type { Lead, Quote } from "@/types";
 import { LayoutDashboard, MessageSquare, User, LogOut, Sparkles } from "lucide-react";
 
@@ -28,7 +28,7 @@ export default function ContractorDashboardPage() {
         setDemo(true);
         const unlockedIds = new Set(getDemoUnlockedLeadIds());
         setLeads(MOCK_LEADS.map((l) => ({ ...l, unlocked: unlockedIds.has(l.id), unlock_count: unlockedIds.has(l.id) ? 1 : 0 })));
-        setQuotes(MOCK_QUOTES);
+        setQuotes([...(getDemoQuotes() as unknown as Quote[]), ...MOCK_QUOTES]);
         setUser({
           email: `demo@${siteConfig.brand.domain}`,
           business_name: `${siteConfig.brand.emoji} Demo Contractor`,

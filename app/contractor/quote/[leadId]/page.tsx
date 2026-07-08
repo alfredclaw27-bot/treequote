@@ -13,7 +13,7 @@ import type { Lead } from "@/types";
 import { siteConfig, getLeadPriceCents } from "@/config/site";
 import { formatDetailsSummary } from "@/lib/details";
 import { findMockLead } from "@/lib/mock-data";
-import { isDemoMode, isDemoLeadUnlocked, unlockDemoLead, getDemoCredits, spendDemoCredit } from "@/lib/demo";
+import { isDemoMode, isDemoLeadUnlocked, unlockDemoLead, getDemoCredits, spendDemoCredit, saveDemoQuote } from "@/lib/demo";
 
 function QuotePageContent() {
   const params = useParams();
@@ -147,6 +147,16 @@ function QuotePageContent() {
 
   const handleSubmitQuote = async ({ amount, notes, estimatedDate }: { amount: number; notes: string; estimatedDate: string }) => {
     if (demo) {
+      saveDemoQuote({
+        id: `demo-quote-${Date.now().toString(36)}`,
+        lead_id: leadId,
+        amount,
+        notes,
+        estimated_date: estimatedDate,
+        status: "pending",
+        created_at: new Date().toISOString(),
+        lead,
+      });
       router.push("/contractor/dashboard");
       return;
     }

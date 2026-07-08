@@ -26,3 +26,10 @@
   - Also fixed: `/api/contractor/checkout` + `/api/contractor/verify-session` were calling the *browser* Supabase client from inside Route Handlers (no-op auth check server-side); admin/lead queries were joining against tables without the `tq_` prefix (always empty).
   - `npm run build` passes, `npx playwright test --project=chromium` is 46/46 green.
   - **Needs Mike:** run `migrations/2026-07-07-lead-credits.sql` against the real Supabase DB (or `lib/supabase/schema.sql` for a fresh one) before deploying; create the `treequote-photos` storage bucket (renamed from `tree-photos`, see `FORKING.md`); consider rotating the leaked DB password mentioned above if that project is still live. Full report given to Mike separately.
+
+- **2026-07-07 — fable-main (after click-through verification of the build agent's work):** Found and fixed 4 issues the test suite missed, all in the zero-env-keys demo path:
+  1. Customer submit errored ("Failed to save your information") with no Supabase keys — now simulates success via `isSupabaseConfigured()` + `saveDemoLead()` in `lib/demo.ts`, routes to /submitted with a demo ref.
+  2. `PhotoUploader` called parent `onUploaded` inside a `setPhotos` updater → React "cannot update while rendering" error; refactored to track upload state in a local array.
+  3. Demo-mode quote submissions vanished — now persisted via `saveDemoQuote()`/`getDemoQuotes()` and merged into the dashboard My Quotes tab.
+  4. `/customer/quotes/[demo-id]` showed "Lead not found" — now falls back to `findDemoLead()` and shows the waiting-for-quotes state; also null-guarded `lead.service_types`.
+  Verified by full click-through: landing → 6-step wizard → submitted → customer quotes view; contractor demo login → masked contacts → credit unlock (2→1) → contact reveal → quote submit → appears in My Quotes. Admin renders empty-but-graceful without keys.

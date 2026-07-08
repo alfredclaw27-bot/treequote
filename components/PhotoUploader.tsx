@@ -65,10 +65,12 @@ export function PhotoUploader({ onUploaded, currentUrls = [] }: PhotoUploaderPro
 
     const files = Array.from(incoming).slice(0, remaining);
 
-    // Add placeholder entries immediately
+    // Add placeholder entries immediately. `current` tracks the working
+    // list locally so we never have to read state back mid-upload.
     const placeholders = files.map(() => ({ url: "", uploading: true }));
     const newIndexStart = photos.length;
-    syncState([...photos, ...placeholders]);
+    const current = [...photos, ...placeholders];
+    syncState(current);
     setUploading(true);
 
     for (let i = 0; i < files.length; i++) {
@@ -82,18 +84,14 @@ export function PhotoUploader({ onUploaded, currentUrls = [] }: PhotoUploaderPro
       const uploadedUrl = await uploadFile(file);
       const idx = newIndexStart + i;
 
-      setPhotos((prev) => {
-        const updated = [...prev];
-        if (uploadedUrl) {
-          updated[idx] = { url: uploadedUrl, uploading: false };
-        } else {
-          updated[idx] = { url: previewUrl, uploading: false };
-        }
-        const allDone = updated.every((p) => !p.uploading);
-        if (allDone) setUploading(false);
-        onUploaded(updated.filter((p) => !p.uploading).map((p) => p.url));
-        return updated;
-      });
+      // Calling onUploaded / setUploading inside setPhotos' updater would
+      // trigger React's "cannot update a component while rendering" error,
+      // so state is tracked in the local `current` array instead.
+      current[idx] = { url: uploadedUrl ?? previewUrl, uploading: false };
+      setPhotos([...current]);
+      const allDone = current.every((p) => !p.uploading);
+      if (allDone) setUploading(false);
+      onUploaded(current.filter((p) => !p.uploading).map((p) => p.url));
     }
   };
 

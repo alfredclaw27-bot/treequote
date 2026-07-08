@@ -12,6 +12,38 @@ import { appSlug, demoModeKey } from "@/config/site";
 const DEMO_FLAG_KEY = demoModeKey;
 const DEMO_UNLOCKED_KEY = `${appSlug}_demo_unlocked`;
 const DEMO_CREDITS_KEY = `${appSlug}_demo_credits`;
+const DEMO_LEADS_KEY = `${appSlug}_demo_leads`;
+
+/**
+ * Whether a real Supabase backend is configured. When it isn't (fresh
+ * clone, local demo), customer submissions are simulated client-side
+ * instead of erroring out against the placeholder Supabase URL.
+ */
+export function isSupabaseConfigured(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+}
+
+export function saveDemoLead(lead: Record<string, unknown>): void {
+  try {
+    const existing = JSON.parse(localStorage.getItem(DEMO_LEADS_KEY) ?? "[]");
+    localStorage.setItem(DEMO_LEADS_KEY, JSON.stringify([...existing, lead]));
+  } catch {
+    localStorage.setItem(DEMO_LEADS_KEY, JSON.stringify([lead]));
+  }
+}
+
+export function getDemoLeads(): Record<string, unknown>[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(DEMO_LEADS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function findDemoLead(leadId: string): Record<string, unknown> | undefined {
+  return getDemoLeads().find((l) => l.id === leadId);
+}
 
 const STARTING_DEMO_CREDITS = 2;
 
@@ -53,6 +85,21 @@ export function unlockDemoLead(leadId: string): void {
   if (!ids.includes(leadId)) {
     localStorage.setItem(DEMO_UNLOCKED_KEY, JSON.stringify([...ids, leadId]));
   }
+}
+
+const DEMO_QUOTES_KEY = `${appSlug}_demo_quotes`;
+
+export function getDemoQuotes(): Record<string, unknown>[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(DEMO_QUOTES_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function saveDemoQuote(quote: Record<string, unknown>): void {
+  localStorage.setItem(DEMO_QUOTES_KEY, JSON.stringify([quote, ...getDemoQuotes()]));
 }
 
 export function getDemoCredits(): number {

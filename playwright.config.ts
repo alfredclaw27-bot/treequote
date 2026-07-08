@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Overridable so test runs don't collide with other dev servers on this
+// machine (e.g. PW_PORT=3150 npx playwright test).
+const port = process.env.PW_PORT ?? "3000";
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
@@ -8,7 +12,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["html"], ["list"]],
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: `http://localhost:${port}`,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -23,8 +27,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
+    command: `npm run dev -- --port ${port}`,
+    url: `http://localhost:${port}`,
     reuseExistingServer: true,
     timeout: 120_000,
   },

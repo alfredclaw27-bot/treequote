@@ -12,6 +12,7 @@ import { ArrowLeft, Calendar, MessageSquare, CheckCircle, Clock } from "lucide-r
 import { siteConfig } from "@/config/site";
 import { formatDetailsSummary } from "@/lib/details";
 import { findMockLead } from "@/lib/mock-data";
+import { findDemoLead, getDemoQuotes } from "@/lib/demo";
 
 export default function CustomerQuotesPage() {
   const params = useParams();
@@ -42,8 +43,10 @@ export default function CustomerQuotesPage() {
         if (quotesData) setQuotes(quotesData as (Quote & { contractor?: Contractor })[]);
       } else {
         // Fall back to demo/mock lead so the confirmation link always works
-        const mockLead = findMockLead(leadId);
+        const mockLead = findMockLead(leadId) ?? (findDemoLead(leadId) as unknown as Lead | undefined);
         if (mockLead) setLead(mockLead);
+        const demoQuotes = getDemoQuotes().filter((q) => q.lead_id === leadId);
+        if (demoQuotes.length > 0) setQuotes(demoQuotes as unknown as (Quote & { contractor?: Contractor })[]);
       }
       setLoading(false);
     };
@@ -74,7 +77,7 @@ export default function CustomerQuotesPage() {
     );
   }
 
-  const serviceLabels = lead.service_types
+  const serviceLabels = (lead.service_types ?? [])
     .map((id) => siteConfig.serviceTypes.find((s) => s.id === id)?.label ?? id)
     .join(", ");
 

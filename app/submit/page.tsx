@@ -8,6 +8,7 @@ import { ServiceSelector } from "@/components/ServiceSelector";
 import { LocationInput } from "@/components/LocationInput";
 import { DetailsForm } from "@/components/DetailsForm";
 import { formatDetailsSummary } from "@/lib/details";
+import { isSupabaseConfigured, saveDemoLead } from "@/lib/demo";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { siteConfig } from "@/config/site";
@@ -49,6 +50,25 @@ export default function SubmitPage() {
   const handleSubmit = async () => {
     setSubmitting(true);
     setError("");
+
+    // No backend configured (fresh clone / local demo) — simulate success
+    // instead of failing against the placeholder Supabase URL.
+    if (!isSupabaseConfigured()) {
+      const demoId = `demo-${Date.now().toString(36)}`;
+      saveDemoLead({
+        id: demoId,
+        photo_url: photoUrls[0] ?? "",
+        photo_urls: photoUrls,
+        service_types: serviceTypes,
+        address,
+        details,
+        status: "new",
+        created_at: new Date().toISOString(),
+        customer: contact,
+      });
+      router.push(`/submitted?ref=${demoId}`);
+      return;
+    }
 
     try {
       // Create customer
