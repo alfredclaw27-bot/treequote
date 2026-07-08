@@ -4,6 +4,11 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "sk_test_place
   apiVersion: "2026-03-25.dahlia",
 });
 
+export function isStripeConfigured(): boolean {
+  const key = process.env.STRIPE_SECRET_KEY;
+  return !!key && key !== "sk_test_placeholder";
+}
+
 export async function createLeadPaymentIntent(amountCents: number, leadId: string, contractorId: string) {
   return stripe.paymentIntents.create({
     amount: amountCents,
@@ -11,5 +16,3 @@ export async function createLeadPaymentIntent(amountCents: number, leadId: strin
     metadata: { leadId, contractorId },
   });
 }
-
-export const LEAD_PRICE_CENTS = parseInt(process.env.LEAD_PRICE_CENTS ?? "1000", 10);

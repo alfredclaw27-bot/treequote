@@ -6,10 +6,15 @@ export interface Customer {
   created_at: string;
 }
 
+/** Freeform answers keyed by config.detailFields[].key */
+export type LeadDetails = Record<string, string | boolean | string[] | undefined>;
+
 export interface Lead {
   id: string;
   customer_id: string;
   photo_url: string;
+  photo_urls?: string[];
+  details?: LeadDetails;
   analysis_data: AnalysisData | null;
   estimated_price?: EstimatedPrice;
   service_types: string[];
@@ -23,6 +28,12 @@ export interface Lead {
   notification_targets?: string[];
   created_at: string;
   customer?: Customer;
+  /** Populated client-side for contractor views: has the current contractor unlocked this lead? */
+  unlocked?: boolean;
+  /** How many contractors have already unlocked this lead */
+  unlock_count?: number;
+  /** True when `unlock_count >= maxContractorsPerLead` */
+  is_full?: boolean;
 }
 
 export interface AnalysisData {
@@ -53,6 +64,8 @@ export interface Contractor {
   specialties: string[];
   approved: boolean;
   stripe_customer_id?: string;
+  lead_credits: number;
+  is_founding: boolean;
   created_at: string;
 }
 
@@ -70,10 +83,13 @@ export interface Quote {
   contractor?: Contractor;
 }
 
-export const SERVICE_TYPES = [
-  { id: "removal", label: "Tree Removal", icon: "🪓" },
-  { id: "trimming", label: "Trimming / Pruning", icon: "✂️" },
-  { id: "stump", label: "Stump Grinding", icon: "⚙️" },
-  { id: "palm", label: "Palm Cleaning", icon: "🌴" },
-  { id: "other", label: "Other", icon: "❓" },
-];
+export interface LeadAccess {
+  id: string;
+  lead_id: string;
+  contractor_id: string;
+  payment_status: "pending" | "completed";
+  unlock_method?: "stripe" | "credit";
+  stripe_session_id?: string;
+  stripe_payment_id?: string;
+  created_at: string;
+}

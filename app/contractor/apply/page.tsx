@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
-import { SERVICE_TYPES } from "@/types";
-import { Loader2, Building2, MapPin, Phone, Mail, ArrowRight, Sun, Moon } from "lucide-react";
+import { siteConfig } from "@/config/site";
+import { Loader2, Building2, MapPin, Phone, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
 export default function ContractorApplyPage() {
@@ -86,7 +86,7 @@ export default function ContractorApplyPage() {
           <Link href="/" className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm font-medium">
             ← Back
           </Link>
-          <span className="font-bold text-lg text-gray-900 dark:text-white">🌳 TreeQuote</span>
+          <span className="font-bold text-lg text-gray-900 dark:text-white">{siteConfig.brand.emoji} {siteConfig.brand.name}</span>
           <button
             onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -99,12 +99,12 @@ export default function ContractorApplyPage() {
 
       <div className="max-w-lg mx-auto px-6 py-8">
         <div className="mb-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-full text-sm font-medium mb-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-accent/10 text-accent-dark dark:text-accent rounded-full text-sm font-medium mb-3">
             <Building2 size={14} /> For Contractors
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Join the Network</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Contractor Application</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm">
-            Apply to start receiving qualified tree service leads in your area. Review within 24 hours.
+            Apply to start receiving qualified leads in your area. Review within 24 hours. {siteConfig.contractorPitch.foundingCalloutTitle}.
           </p>
         </div>
 
@@ -115,7 +115,7 @@ export default function ContractorApplyPage() {
               label="Business Name"
               value={form.businessName}
               onChange={(e) => setForm({ ...form, businessName: e.target.value })}
-              placeholder="ABC Tree Services"
+              placeholder="ABC Services Inc."
               required
             />
             <Input
@@ -124,7 +124,7 @@ export default function ContractorApplyPage() {
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="contact@abctrees.com"
+              placeholder="contact@example.com"
               required
             />
             <Input
@@ -163,14 +163,14 @@ export default function ContractorApplyPage() {
             <div>
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Specialties</p>
               <div className="flex flex-wrap gap-2">
-                {SERVICE_TYPES.map(({ id, label, icon }) => (
+                {siteConfig.serviceTypes.map(({ id, label, icon }) => (
                   <button
                     key={id}
                     type="button"
                     onClick={() => toggleSpecialty(id)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                       form.specialties.includes(id)
-                        ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/40 dark:border-green-700 dark:text-green-300"
+                        ? "bg-primary/10 border-primary/40 text-primary-dark dark:text-primary"
                         : "bg-white border-gray-200 text-gray-600 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
                     }`}
                   >
@@ -180,9 +180,9 @@ export default function ContractorApplyPage() {
               </div>
             </div>
 
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-sm">
-              <p className="font-semibold text-amber-800 dark:text-amber-200 mb-1">What happens after you apply?</p>
-              <ul className="space-y-1 text-amber-700 dark:text-amber-300">
+            <div className="bg-accent/10 border border-accent/30 rounded-xl p-4 text-sm">
+              <p className="font-semibold text-accent-dark dark:text-accent mb-1">What happens after you apply?</p>
+              <ul className="space-y-1 text-gray-700 dark:text-gray-300">
                 <li>✓ We review your application (within 24 hours)</li>
                 <li>✓ You receive an email when approved</li>
                 <li>✓ Log in and start receiving leads!</li>
@@ -193,7 +193,7 @@ export default function ContractorApplyPage() {
               <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-2">{error}</p>
             )}
 
-            <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600" disabled={loading}>
+            <Button type="submit" className="w-full bg-accent hover:bg-accent-dark text-white" disabled={loading}>
               {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
               {loading ? "Submitting..." : "Submit Application"}
             </Button>
@@ -202,7 +202,7 @@ export default function ContractorApplyPage() {
 
         <p className="text-center text-sm text-gray-400 dark:text-gray-500 mt-6">
           Already have an account?{" "}
-          <Link href="/contractor/login" className="text-green-600 dark:text-green-400 font-medium hover:underline">
+          <Link href="/contractor/login" className="text-primary font-medium hover:underline">
             Sign in
           </Link>
         </p>

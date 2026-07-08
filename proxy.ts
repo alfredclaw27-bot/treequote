@@ -1,11 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { demoModeKey } from "@/config/site";
 
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
 
-  // Allow demo mode bypass
-  if (request.nextUrl.searchParams.get("demo") === "true") {
+  // Allow demo mode bypass. The `?demo=true` query param covers the very
+  // first navigation (from the login page, before the cookie is set); the
+  // cookie (mirrored from localStorage by lib/demo.ts) covers every
+  // navigation after that, since this middleware can't read localStorage.
+  if (
+    request.nextUrl.searchParams.get("demo") === "true" ||
+    request.cookies.get(demoModeKey)?.value === "contractor"
+  ) {
     return response;
   }
 

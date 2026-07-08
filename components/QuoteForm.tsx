@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
+import { siteConfig } from "@/config/site";
 import type { Lead } from "@/types";
 
 interface QuoteFormProps {
@@ -35,18 +36,22 @@ export function QuoteForm({ lead, onSubmit, priceCents }: QuoteFormProps) {
     }
   };
 
+  const serviceLabels = lead.service_types
+    .map((id) => siteConfig.serviceTypes.find((s) => s.id === id)?.label ?? id)
+    .join(", ");
+
   return (
-    <Card className="p-6">
+    <Card className="p-6 dark:bg-gray-800 dark:border-gray-700">
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Submit Your Quote</h2>
-        <p className="text-gray-500 text-sm">
-          Customer looking for: <span className="font-medium capitalize">{lead.service_types.join(", ")}</span>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Submit Your Quote</h2>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">
+          Customer looking for: <span className="font-medium">{serviceLabels}</span>
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Quote Amount ($)</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quote Amount ($)</label>
           <Input
             type="number"
             min="1"
@@ -59,7 +64,7 @@ export function QuoteForm({ lead, onSubmit, priceCents }: QuoteFormProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Completion Date</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estimated Completion Date</label>
           <Input
             type="date"
             value={estimatedDate}
@@ -69,27 +74,26 @@ export function QuoteForm({ lead, onSubmit, priceCents }: QuoteFormProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Notes to Customer</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes to Customer</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Describe your approach, what's included, any questions..."
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
             rows={4}
           />
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-sm text-amber-800">
-            <strong>${(priceCents / 100).toFixed(2)} lead access fee</strong> will be charged via Stripe when you submit your quote. 
-            The customer&apos;s contact info will be revealed for 24 hours.
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+          <p className="text-sm text-primary-dark dark:text-primary">
+            This lead is unlocked (${(priceCents / 100).toFixed(2)} value) — submitting a quote sends it directly to the customer.
           </p>
         </div>
 
         {error && <p className="text-sm text-red-500">{error}</p>}
 
         <Button type="submit" className="w-full" size="lg" disabled={loading}>
-          {loading ? "Submitting..." : `Submit Quote — $${(priceCents / 100).toFixed(2)}`}
+          {loading ? "Submitting..." : "Submit Quote"}
         </Button>
       </form>
     </Card>

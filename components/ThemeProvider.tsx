@@ -1,6 +1,9 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { appSlug } from "@/config/site";
+
+const THEME_STORAGE_KEY = `${appSlug}-theme`;
 
 type Theme = "light" | "dark" | "system";
 
@@ -16,15 +19,14 @@ const ThemeContext = createContext<ThemeContextValue>({
   setTheme: () => {},
 });
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system");
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "system";
+  return (localStorage.getItem(THEME_STORAGE_KEY) as Theme | null) ?? "system";
+}
 
-  useEffect(() => {
-    // Load saved preference
-    const saved = localStorage.getItem("treequote-theme") as Theme | null;
-    if (saved) setThemeState(saved);
-  }, []);
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -50,7 +52,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
-    localStorage.setItem("treequote-theme", newTheme);
+    localStorage.setItem(THEME_STORAGE_KEY, newTheme);
   };
 
   return (

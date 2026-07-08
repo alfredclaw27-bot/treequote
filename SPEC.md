@@ -1,5 +1,15 @@
 # Tree Service Lead Gen — Full Vision Spec
 
+> **Status note (2026-07-07):** This doc describes the original full vision,
+> including AI photo analysis. The shipped MVP runs **without AI** in the
+> active flow — the structured question schema in `config/site.ts`
+> (`detailFields`) replaces AI-extracted tree details, and pricing is a
+> flat per-service-type fee instead of an AI-generated estimate. The AI
+> code described below still exists (`lib/ai-analysis.ts`,
+> `/api/leads/[id]/analyze`) and can be re-enabled via
+> `config.features.aiAnalysis`, but it's off by default. See `README.md`
+> and `FORKING.md` for the current architecture.
+
 ## 1. Concept & Vision
 
 A mobile-first web app where **customers snap a photo of a tree** and receive competitive quotes from local contractors within hours. AI analyzes the photo to extract tree details (species, height estimate, health, obstacles), packages everything into a qualified lead, and distributes it to contractors who pay per lead. Customers get quotes; contractors get business; we take a cut.

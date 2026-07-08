@@ -1,10 +1,20 @@
 @import "tailwindcss";
 
+/*
+ * Brand theme tokens — these MUST be kept in sync with `config/site.ts`'s
+ * `theme` object (Tailwind v4 reads CSS at build time, so it can't pull
+ * these from a TS file directly). When forking to a new vertical, update
+ * both places. See FORKING.md.
+ *
+ * Any class can use opacity modifiers for tints, e.g. `bg-primary/10`,
+ * `border-accent/30` — no need for separate "light" shade tokens.
+ */
 @theme {
   --color-primary: #16A34A;
   --color-primary-dark: #15803D;
   --color-secondary: #15803D;
   --color-accent: #F59E0B;
+  --color-accent-dark: #D97706;
   --color-bg: #F9FAFB;
   --color-bg-dark: #111827;
 }
@@ -53,10 +63,10 @@ body {
 }
 
 .step-dot.active {
-  background-color: #16A34A;
+  background-color: var(--color-primary);
   width: 24px;
 }
 
 .step-dot.completed {
-  background-color: #16A34A;
+  background-color: var(--color-primary);
 }

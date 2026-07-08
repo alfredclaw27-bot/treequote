@@ -1,15 +1,19 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { ServiceSelector } from "@/components/ServiceSelector";
 import { LocationInput } from "@/components/LocationInput";
+import { DetailsForm } from "@/components/DetailsForm";
+import { formatDetailsSummary } from "@/lib/details";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import type { Lead } from "@/types";
+import { siteConfig } from "@/config/site";
+import type { LeadDetails } from "@/types";
 
-const STEPS = ["Photos", "Service", "Tree Details", "Location", "Contact", "Review"];
+const STEPS = ["Photos", "Service", "Details", "Location", "Contact", "Review"];
 
 export default function SubmitPage() {
   const router = useRouter();
@@ -22,27 +26,21 @@ export default function SubmitPage() {
   // Form state
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
-  const [treeDetails, setTreeDetails] = useState({
-    height: "",
-    treeType: "",
-    stumpDiameter: "",
-    stumpRemoval: false,
-    equipmentAccess: "",
-    nearFence: false,
-    nearStructure: false,
-    nearPowerLines: false,
-    clippings: "haul_away",
-    notes: "",
-  });
+  const [details, setDetails] = useState<LeadDetails>({});
   const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
+  const [latitude] = useState<number | null>(null);
+  const [longitude] = useState<number | null>(null);
   const [contact, setContact] = useState({ name: "", phone: "", email: "" });
+
+  const requiredDetailFields = siteConfig.detailFields.filter((f) => f.required);
 
   const canNext = () => {
     if (step === 0) return photoUrls.length > 0;
     if (step === 1) return serviceTypes.length > 0;
-    if (step === 2) return treeDetails.height && treeDetails.treeType;
+    if (step === 2) return requiredDetailFields.every((f) => {
+      const v = details[f.key];
+      return v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0);
+    });
     if (step === 3) return address.length > 5;
     if (step === 4) return contact.name && contact.phone;
     return true;
@@ -53,7 +51,7 @@ export default function SubmitPage() {
     setError("");
 
     try {
-      // Create or get customer
+      // Create customer
       const { data: customer, error: customerError } = await supabase
         .from("tq_customers")
         .insert({ name: contact.name, phone: contact.phone, email: contact.email || null })
@@ -72,12 +70,13 @@ export default function SubmitPage() {
         .insert({
           customer_id: customer.id,
           photo_url: photoUrls[0] ?? "",
+          photo_urls: photoUrls,
           service_types: serviceTypes,
           address,
-          latitude: latitude ?? null,
-          longitude: longitude ?? null,
+          latitude,
+          longitude,
           status: "new",
-          analysis_data: { treeDetails, customerName: contact.name, customerPhone: contact.phone },
+          details,
         })
         .select("id")
         .single();
@@ -88,13 +87,26 @@ export default function SubmitPage() {
         return;
       }
 
-      // Fire-and-forget: AI analysis + notifications
-      const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://tree-service-lead-gen.vercel.app";
-      fetch(`${baseUrl}/api/leads/${lead.id}/analyze`, { method: "POST" }).catch(() => {});
+      // Fire-and-forget: contractor notifications + customer confirmation email
+      const baseUrl = typeof window !== "undefined" ? window.location.origin : `https://${siteConfig.brand.domain}`;
+      if (siteConfig.features.aiAnalysis) {
+        fetch(`${baseUrl}/api/leads/${lead.id}/analyze`, { method: "POST" }).catch(() => {});
+      }
       fetch(`${baseUrl}/api/notifications/send-lead-alerts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadId: lead.id }),
+      }).catch(() => {});
+      fetch(`${baseUrl}/api/customers/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: contact.email,
+          customerName: contact.name,
+          leadId: lead.id,
+          serviceTypes,
+          address,
+        }),
       }).catch(() => {});
 
       router.push(`/submitted?ref=${lead.id}`);
@@ -105,18 +117,21 @@ export default function SubmitPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="font-bold text-xl text-gray-900">🌳 TreeQuote</span>
+          <Link href="/" className="font-bold text-xl text-gray-900 dark:text-white">
+            {siteConfig.brand.emoji} {siteConfig.brand.name}
+          </Link>
           <span className="text-sm text-gray-400">Step {step + 1} of {STEPS.length}</span>
         </div>
         {/* Progress */}
         <div className="flex gap-1 px-6 pb-3">
-          {STEPS.map ((_, i) => (
+          {STEPS.map((_, i) => (
             <div
               key={i}
-              className={`h-1 flex-1 rounded-full transition-all ${i <= step ? "bg-green-500" : "bg-gray-200"}`}
+              data-testid="progress-step"
+              className={`h-1 flex-1 rounded-full transition-all ${i <= step ? "bg-primary" : "bg-gray-200 dark:bg-gray-700"}`}
             />
           ))}
         </div>
@@ -124,12 +139,12 @@ export default function SubmitPage() {
 
       <div className="max-w-lg mx-auto px-6 py-8">
         {/* Step indicator */}
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">{STEPS[step]}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{STEPS[step]}</h1>
         <p className="text-gray-400 text-sm mb-6">
-          {step === 0 && "Upload photos of the tree(s) you need service on"}
+          {step === 0 && `Upload photos of the ${siteConfig.itemNounSingular}(s) you need service on`}
           {step === 1 && "Select the type of service you need"}
-          {step === 2 && "Tell us about the tree's size and location"}
-          {step === 3 && "Where is the tree located?"}
+          {step === 2 && `Tell us about your ${siteConfig.itemNounSingular} and the job`}
+          {step === 3 && "Where is the job located?"}
           {step === 4 && "How can contractors reach you?"}
           {step === 5 && "Review and submit your request"}
         </p>
@@ -149,143 +164,9 @@ export default function SubmitPage() {
           <ServiceSelector selected={serviceTypes} onChange={setServiceTypes} />
         )}
 
-        {/* Step 2: Tree Details */}
+        {/* Step 2: Details (config-driven) */}
         {step === 2 && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Approximate tree height</label>
-              <div className="grid grid-cols-2 gap-2">
-                {["Under 20 ft", "20–40 ft", "40–60 ft", "Over 60 ft", "Not sure"].map((h) => (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() => setTreeDetails((p) => ({ ...p, height: h }))}
-                    className={`py-3 px-3 rounded-xl border-2 text-sm font-medium transition-all ${treeDetails.height === h ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
-                  >
-                    {h}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tree type</label>
-              <div className="grid grid-cols-2 gap-2">
-                {["Oak", "Pine", "Maple", "Birch", "Willow", "Palm", "Other / Not sure"].map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTreeDetails((p) => ({ ...p, treeType: t }))}
-                    className={`py-3 px-3 rounded-xl border-2 text-sm font-medium transition-all ${treeDetails.treeType === t ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Stump situation</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[["no_stump", "No stump"], ["has_stump", "Has stump"], ["already_removed", "Already removed"]].map(([val, label]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setTreeDetails((p) => ({ ...p, stumpDiameter: val }))}
-                    className={`py-3 px-3 rounded-xl border-2 text-sm font-medium transition-all ${treeDetails.stumpDiameter === val ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {treeDetails.stumpDiameter === "has_stump" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Stump diameter (if known)</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {["Under 12 in", "12–24 in", "24–36 in", "Over 36 in"].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setTreeDetails((p) => ({ ...p, stumpDiameter: d }))}
-                      className={`py-2.5 px-2 rounded-xl border-2 text-xs font-medium transition-all ${treeDetails.stumpDiameter === d ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Equipment access</label>
-              <div className="grid grid-cols-2 gap-2">
-                {["Wide open yard", "Narrow passage", "Behind fence", "Crane required", "Not sure"].map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    onClick={() => setTreeDetails((p) => ({ ...p, equipmentAccess: e }))}
-                    className={`py-3 px-3 rounded-xl border-2 text-sm font-medium transition-all ${treeDetails.equipmentAccess === e ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Site conditions</label>
-              <div className="space-y-2">
-                {[
-                  { key: "nearFence", label: "Near fence or gate" },
-                  { key: "nearStructure", label: "Near house or structure" },
-                  { key: "nearPowerLines", label: "Near power lines" },
-                ].map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={treeDetails[key as keyof typeof treeDetails] as boolean}
-                      onChange={(e) => setTreeDetails((p) => ({ ...p, [key]: e.target.checked }))}
-                      className="w-5 h-5 rounded border-gray-300 text-green-600"
-                    />
-                    <span className="text-sm text-gray-700">{label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">What to do with clippings?</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  ["haul_away", "Haul away"],
-                  ["leave_chips", "Leave as mulch"],
-                  ["keep_logs", "Keep logs"],
-                ].map(([val, label]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setTreeDetails((p) => ({ ...p, clippings: val }))}
-                    className={`py-3 px-3 rounded-xl border-2 text-sm font-medium transition-all ${treeDetails.clippings === val ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Additional notes <span className="text-gray-400 font-normal">(optional)</span></label>
-              <textarea
-                value={treeDetails.notes}
-                onChange={(e) => setTreeDetails((p) => ({ ...p, notes: e.target.value }))}
-                placeholder="Anything else contractors should know..."
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                rows={3}
-              />
-            </div>
-          </div>
+          <DetailsForm values={details} onChange={setDetails} />
         )}
 
         {/* Step 3: Location */}
@@ -297,33 +178,33 @@ export default function SubmitPage() {
         {step === 4 && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Your name</label>
               <input
                 type="text"
                 value={contact.name}
                 onChange={(e) => setContact((p) => ({ ...p, name: e.target.value }))}
                 placeholder="John Smith"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone number</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone number</label>
               <input
                 type="tel"
                 value={contact.phone}
                 onChange={(e) => setContact((p) => ({ ...p, phone: e.target.value }))}
                 placeholder="(555) 867-5309"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-gray-400 font-normal">(optional)</span></label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email <span className="text-gray-400 font-normal">(optional)</span></label>
               <input
                 type="email"
                 value={contact.email}
                 onChange={(e) => setContact((p) => ({ ...p, email: e.target.value }))}
                 placeholder="john@example.com"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
           </div>
@@ -332,7 +213,7 @@ export default function SubmitPage() {
         {/* Step 5: Review */}
         {step === 5 && (
           <div className="space-y-4">
-            <Card className="p-4">
+            <Card className="p-4 dark:bg-gray-800 dark:border-gray-700">
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Photos</p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {photoUrls.map((url, i) => (
@@ -340,22 +221,32 @@ export default function SubmitPage() {
                 ))}
               </div>
             </Card>
-            <Card className="p-4 space-y-2">
+            <Card className="p-4 space-y-2 dark:bg-gray-800 dark:border-gray-700">
               <p className="text-xs text-gray-400 uppercase tracking-wide">Service</p>
               <div className="flex flex-wrap gap-2">
                 {serviceTypes.map((s) => (
-                  <span key={s} className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">{s}</span>
+                  <span key={s} className="px-3 py-1 bg-primary/10 text-primary-dark dark:text-primary rounded-full text-sm font-medium">
+                    {siteConfig.serviceTypes.find((st) => st.id === s)?.label ?? s}
+                  </span>
                 ))}
               </div>
-              <p className="text-sm text-gray-600">{address}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">{address}</p>
             </Card>
-            <Card className="p-4 space-y-2">
+            {formatDetailsSummary(details).length > 0 && (
+              <Card className="p-4 space-y-1 dark:bg-gray-800 dark:border-gray-700">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Details</p>
+                {formatDetailsSummary(details).map((line) => (
+                  <p key={line} className="text-sm text-gray-600 dark:text-gray-300">{line}</p>
+                ))}
+              </Card>
+            )}
+            <Card className="p-4 space-y-2 dark:bg-gray-800 dark:border-gray-700">
               <p className="text-xs text-gray-400 uppercase tracking-wide">Contact</p>
-              <p className="font-medium">{contact.name}</p>
-              <p className="text-sm text-gray-500">{contact.phone}{contact.email && ` · ${contact.email}`}</p>
+              <p className="font-medium text-gray-900 dark:text-white">{contact.name}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{contact.phone}{contact.email && ` · ${contact.email}`}</p>
             </Card>
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
-              📸 Your photos will be analyzed by AI to help contractors give accurate quotes.
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-sm text-primary-dark dark:text-primary">
+              We&apos;ll notify local contractors who match your job. Expect quotes within 24 hours.
             </div>
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
@@ -367,7 +258,7 @@ export default function SubmitPage() {
 
         {/* Navigation */}
         <div className="flex gap-3 mt-8">
-          {step > 0 && (
+          {step > 0 ? (
             <Button
               variant="secondary"
               onClick={() => setStep((s) => s - 1)}
@@ -375,6 +266,10 @@ export default function SubmitPage() {
             >
               ← Back
             </Button>
+          ) : (
+            <Link href="/" className="flex-1">
+              <Button variant="secondary" className="w-full">← Back</Button>
+            </Link>
           )}
           {step < STEPS.length - 1 ? (
             <Button
@@ -382,7 +277,7 @@ export default function SubmitPage() {
               disabled={!canNext()}
               className="flex-1"
             >
-              Continue
+              Next
             </Button>
           ) : (
             <Button

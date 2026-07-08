@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS tq_leads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   customer_id UUID REFERENCES tq_customers(id) ON DELETE SET NULL,
   photo_url TEXT NOT NULL DEFAULT '',
+  photo_urls TEXT[] DEFAULT '{}',
+  details JSONB DEFAULT '{}',
   analysis_data JSONB,
   estimated_price JSONB,
   service_types TEXT[] NOT NULL DEFAULT '{}',
@@ -43,6 +45,8 @@ CREATE TABLE IF NOT EXISTS tq_contractors (
   approved BOOLEAN DEFAULT false,
   stripe_customer_id TEXT,
   equipment JSONB DEFAULT '{}',
+  lead_credits INTEGER DEFAULT 0,
+  is_founding BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -59,12 +63,15 @@ CREATE TABLE IF NOT EXISTS tq_quotes (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Lead Access (tracks which contractors paid for which leads)
+-- Lead Access (tracks which contractors unlocked which leads — via Stripe or a free credit)
 CREATE TABLE IF NOT EXISTS tq_lead_access (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   lead_id UUID REFERENCES tq_leads(id) ON DELETE SET NULL,
   contractor_id UUID REFERENCES tq_contractors(id) ON DELETE SET NULL,
   paid BOOLEAN DEFAULT false,
+  payment_status TEXT DEFAULT 'pending' CHECK (payment_status IN ('pending', 'completed')),
+  unlock_method TEXT DEFAULT 'stripe' CHECK (unlock_method IN ('stripe', 'credit')),
+  stripe_session_id TEXT,
   stripe_payment_id TEXT,
   accessed_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(lead_id, contractor_id)
@@ -87,5 +94,6 @@ CREATE POLICY "public_read_write" ON tq_lead_access FOR ALL USING (true) WITH CH
 -- =============================================
 -- Storage Bucket
 -- Run in Supabase Dashboard > Storage > New Bucket
--- Name: tree-photos — Public: true
+-- Name: <appSlug>-photos (see `photoStorageBucket` in config/site.ts,
+-- derived from brand.shortName — e.g. "treequote-photos") — Public: true
 -- =============================================

@@ -3,6 +3,7 @@ import { useState, useRef, useCallback } from "react";
 import imageCompression from "browser-image-compression";
 import { createClient } from "@/lib/supabase/client";
 import { Upload, Camera, X, Loader2, Plus } from "lucide-react";
+import { photoStorageBucket } from "@/config/site";
 
 interface PhotoUploaderProps {
   onUploaded: (urls: string[]) => void;
@@ -38,13 +39,13 @@ export function PhotoUploader({ onUploaded, currentUrls = [] }: PhotoUploaderPro
       const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error } = await supabase.storage
-        .from("tree-photos")
+        .from(photoStorageBucket)
         .upload(fileName, compressed, { contentType: `image/${ext}`, upsert: true });
 
       if (error) throw error;
 
       const { data: urlData } = supabase.storage
-        .from("tree-photos")
+        .from(photoStorageBucket)
         .getPublicUrl(fileName);
 
       return urlData.publicUrl;

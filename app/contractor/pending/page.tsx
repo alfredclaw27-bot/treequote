@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CheckCircle2, Clock, Mail } from "lucide-react";
+import { siteConfig } from "@/config/site";
 
 export default function ContractorPendingPage() {
   return (
@@ -65,7 +66,7 @@ export default function ContractorPendingPage() {
         </div>
 
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Questions? Email mike@mtkinnovations.com
+          Questions? Email {siteConfig.brand.supportEmail}
         </p>
       </div>
     </main>

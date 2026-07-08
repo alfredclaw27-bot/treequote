@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { SERVICE_TYPES } from "@/types";
-import { Loader2, Save, Truck, Users, Wrench } from "lucide-react";
+import { siteConfig } from "@/config/site";
+import { Loader2, Save, Truck } from "lucide-react";
 
 const BUCKET_REACH_OPTIONS = [
   { value: "under_30ft", label: "Under 30 ft" },
@@ -115,7 +115,7 @@ export default function ContractorProfilePage() {
           <button onClick={() => router.push("/contractor/dashboard")} className="text-gray-500 hover:text-gray-700 font-medium">
             ← Back
           </button>
-          <span className="font-bold text-lg text-gray-900">🌳 TreeQuote</span>
+          <span className="font-bold text-lg text-gray-900">{siteConfig.brand.emoji} {siteConfig.brand.name}</span>
           <div className="w-16" />
         </div>
       </header>
@@ -135,7 +135,7 @@ export default function ContractorProfilePage() {
             label="Business Name"
             value={businessName}
             onChange={(e) => setBusinessName(e.target.value)}
-            placeholder="ABC Tree Services"
+            placeholder="ABC Services Inc."
           />
           <Input
             label="Phone"
@@ -158,14 +158,14 @@ export default function ContractorProfilePage() {
             <span>✨</span> Specialties
           </h2>
           <div className="flex flex-wrap gap-2">
-            {SERVICE_TYPES.map(({ id, label, icon }) => (
+            {siteConfig.serviceTypes.map(({ id, label, icon }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => toggleSpecialty(id)}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   specialties.includes(id)
-                    ? "bg-green-100 border-green-300 text-green-700"
+                    ? "bg-primary/10 border-primary/40 text-primary-dark"
                     : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
                 }`}
               >
@@ -190,7 +190,7 @@ export default function ContractorProfilePage() {
                   onClick={() => setBucketReach(value)}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                     bucketReach === value
-                      ? "bg-green-100 border-green-300 text-green-700"
+                      ? "bg-primary/10 border-primary/40 text-primary-dark"
                       : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
                   }`}
                 >
@@ -209,7 +209,7 @@ export default function ContractorProfilePage() {
                   onClick={() => setCrewSize(value)}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                     crewSize === value
-                      ? "bg-green-100 border-green-300 text-green-700"
+                      ? "bg-primary/10 border-primary/40 text-primary-dark"
                       : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
                   }`}
                 >
@@ -228,7 +228,7 @@ export default function ContractorProfilePage() {
                   onClick={() => toggleEquipment(id)}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                     equipment.includes(id)
-                      ? "bg-green-100 border-green-300 text-green-700"
+                      ? "bg-primary/10 border-primary/40 text-primary-dark"
                       : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
                   }`}
                 >

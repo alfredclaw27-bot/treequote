@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { analyzeTreePhoto } from "@/lib/ai-analysis";
-import { generatePriceEstimate } from "@/lib/ai-analysis";
+import { analyzeTreePhoto, generatePriceEstimate } from "@/lib/ai-analysis";
+import { siteConfig } from "@/config/site";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!siteConfig.features.aiAnalysis) {
+    return NextResponse.json(
+      { error: "AI analysis is disabled for this deployment. Enable `features.aiAnalysis` in config/site.ts to turn it on." },
+      { status: 404 }
+    );
+  }
+
   const { id } = await params;
   const supabase = await createServiceClient();
 

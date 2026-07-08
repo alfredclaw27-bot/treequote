@@ -1,6 +1,7 @@
 import type { AnalysisData } from "@/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { siteConfig } from "@/config/site";
 
 interface AnalysisDisplayProps {
   data: AnalysisData;
@@ -17,7 +18,7 @@ export function AnalysisDisplay({ data }: AnalysisDisplayProps) {
   return (
     <Card className="p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900">🌳 AI Tree Analysis</h3>
+        <h3 className="font-semibold text-gray-900">{siteConfig.brand.emoji} AI Analysis</h3>
         <Badge variant={HEALTH_BADGE[data.healthStatus] ?? "gray"}>
           {data.healthStatus}
         </Badge>
