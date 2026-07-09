@@ -16,6 +16,8 @@ export interface Lead {
   customer_id: string;
   photo_url: string;
   photo_urls?: string[];
+  /** Total photos submitted — set in demo mode when only a thumbnail (not every photo) is persisted to localStorage. */
+  photo_count?: number;
   details?: LeadDetails;
   analysis_data: AnalysisData | null;
   estimated_price?: EstimatedPrice;
