@@ -143,6 +143,14 @@ export interface SiteConfig {
     ctaLabel: string;
   };
 
+  /** Emotional-benefit cards shown on the landing page — the "why this matters" hooks. */
+  emotionalBenefits: { icon: string; title: string; desc: string }[];
+
+  /** Small reassurance/urgency copy woven into the submit wizard. */
+  wizardMicrocopy: {
+    reviewReassurance: string;
+  };
+
   contractorPitch: {
     badgeText: string;
     title: string;
@@ -191,6 +199,11 @@ export interface SiteConfig {
     contractorApprovedSubject: string;
     customerConfirmationSubject: string;
     leadAlertSubjectPrefix: string;
+    customerAccountCtaLabel: string;
+    customerAccountCtaSubtitle: string;
+    quoteReceivedSubject: string;
+    quoteAcceptedSubject: string;
+    adminNewLeadSubjectPrefix: string;
   };
 
   features: {
@@ -261,6 +274,28 @@ export const siteConfig: SiteConfig = {
     title: "How much does tree work cost?",
     subtitle: "Tell us about your job and compare quotes from local contractors — no obligation.",
     ctaLabel: "Get My Free Quote",
+  },
+
+  emotionalBenefits: [
+    {
+      icon: "🌙",
+      title: "Sleep through the next storm",
+      desc: "A weak limb or leaning trunk is a 2am phone call waiting to happen. Get it handled before the weather does it for you.",
+    },
+    {
+      icon: "☀️",
+      title: "Get your yard back",
+      desc: "More light, more space, a better view — a yard you actually want to spend time in again.",
+    },
+    {
+      icon: "🏡",
+      title: "Protect your biggest investment",
+      desc: "Overgrown or damaged trees can hurt your home's value and your liability. A little upkeep now avoids a much bigger bill later.",
+    },
+  ],
+
+  wizardMicrocopy: {
+    reviewReassurance: "Local pros are ready — most customers hear back the same day.",
   },
 
   contractorPitch: {
@@ -421,6 +456,20 @@ export const siteConfig: SiteConfig = {
       ],
     },
     {
+      key: "motivation",
+      label: "What's prompting this?",
+      helpText: "Optional — helps contractors understand your priorities when they quote.",
+      kind: "multiselect",
+      options: [
+        { value: "safety", label: "Safety concern" },
+        { value: "storm_damage", label: "Storm damage" },
+        { value: "selling", label: "Selling the property" },
+        { value: "view", label: "Improving the view" },
+        { value: "neighbor", label: "Neighbor issue" },
+        { value: "just_time", label: "It's just time" },
+      ],
+    },
+    {
       key: "notes",
       label: "Additional notes",
       kind: "textarea",
@@ -440,6 +489,11 @@ export const siteConfig: SiteConfig = {
     contractorApprovedSubject: "You're approved! Start receiving leads today",
     customerConfirmationSubject: "We got your request! Quotes incoming within 24 hours",
     leadAlertSubjectPrefix: "New Lead",
+    customerAccountCtaLabel: "Create your account to track quotes",
+    customerAccountCtaSubtitle: "Save your request and check back anytime for new quotes — no need to dig up this email.",
+    quoteReceivedSubject: "You got a new quote!",
+    quoteAcceptedSubject: "A customer accepted your quote!",
+    adminNewLeadSubjectPrefix: "New lead:",
   },
 
   features: {
@@ -484,4 +538,12 @@ export const photoStorageBucket = `${appSlug}-photos`;
  * auth gate, which can only read the cookie mirror of this flag).
  */
 export const demoModeKey = `${appSlug}_demo`;
+
+/**
+ * httpOnly cookie name used to gate `/admin` when `ADMIN_SECRET` is set.
+ * See `proxy.ts` — visiting `/admin?key=<ADMIN_SECRET>` sets this cookie and
+ * redirects to the clean `/admin` URL; without a valid cookie (and no key),
+ * `/admin` 404s instead of showing a login page.
+ */
+export const adminCookieKey = `${appSlug}_admin`;
 
