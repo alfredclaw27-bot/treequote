@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS tq_customers (
   name TEXT NOT NULL,
   email TEXT,
   phone TEXT,
+  -- Linked Supabase Auth user once the customer creates an account
+  -- (see /customer/setup). Matched by email, set via a service-role API route.
+  auth_user_id UUID,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -77,12 +80,25 @@ CREATE TABLE IF NOT EXISTS tq_lead_access (
   UNIQUE(lead_id, contractor_id)
 );
 
+-- Lead Notifications (one row per attempted contractor alert — see lib/notifications.ts)
+CREATE TABLE IF NOT EXISTS tq_lead_notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lead_id UUID REFERENCES tq_leads(id) ON DELETE SET NULL,
+  contractor_name TEXT,
+  contractor_email TEXT,
+  contractor_phone TEXT,
+  channel TEXT DEFAULT 'email',
+  status TEXT DEFAULT 'sent',
+  sent_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- RLS
 ALTER TABLE tq_customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tq_leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tq_contractors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tq_quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tq_lead_access ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tq_lead_notifications ENABLE ROW LEVEL SECURITY;
 
 -- Relax RLS for MVP (full public access)
 CREATE POLICY "public_read_write" ON tq_customers FOR ALL USING (true) WITH CHECK (true);
@@ -90,6 +106,7 @@ CREATE POLICY "public_read_write" ON tq_leads FOR ALL USING (true) WITH CHECK (t
 CREATE POLICY "public_read_write" ON tq_contractors FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "public_read_write" ON tq_quotes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "public_read_write" ON tq_lead_access FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "public_read_write" ON tq_lead_notifications FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================
 -- Storage Bucket

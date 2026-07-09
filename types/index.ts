@@ -3,6 +3,8 @@ export interface Customer {
   name: string;
   email?: string;
   phone?: string;
+  /** Linked Supabase Auth user, once the customer creates an account. */
+  auth_user_id?: string | null;
   created_at: string;
 }
 
