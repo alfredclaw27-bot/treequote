@@ -1,9 +1,37 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { demoModeKey } from "@/config/site";
+import { demoModeKey, adminCookieKey } from "@/config/site";
 
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
+
+  // Secret /admin gate. Invisible when locked: a missing/invalid key 404s
+  // rather than showing a login page, so the route's existence isn't
+  // advertised. Visiting /admin?key=<ADMIN_SECRET> sets an httpOnly cookie
+  // (30d) and redirects to the clean /admin URL; the cookie is what every
+  // later visit checks. When ADMIN_SECRET isn't set (local dev), /admin
+  // stays open.
+  if (request.nextUrl.pathname === "/admin" || request.nextUrl.pathname.startsWith("/admin/")) {
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (adminSecret) {
+      const keyParam = request.nextUrl.searchParams.get("key");
+      if (keyParam === adminSecret) {
+        const redirectResponse = NextResponse.redirect(new URL("/admin", request.url));
+        redirectResponse.cookies.set(adminCookieKey, adminSecret, {
+          httpOnly: true,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 30,
+          secure: process.env.NODE_ENV === "production",
+        });
+        return redirectResponse;
+      }
+
+      if (request.cookies.get(adminCookieKey)?.value !== adminSecret) {
+        return new NextResponse("Not Found", { status: 404 });
+      }
+    }
+  }
 
   // Allow demo mode bypass. The `?demo=true` query param covers the very
   // first navigation (from the login page, before the cookie is set); the
@@ -44,5 +72,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/contractor/:path*"],
+  matcher: ["/contractor/:path*", "/admin", "/admin/:path*"],
 };

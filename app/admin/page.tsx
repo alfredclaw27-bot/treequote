@@ -7,27 +7,49 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { Lead, Contractor, Quote } from "@/types";
 import Link from "next/link";
-import { CheckCircle, XCircle, Star, Plus } from "lucide-react";
+import { CheckCircle, XCircle, Star, Plus, ChevronDown, ChevronUp, Mail, Phone, MessageCircle, Users } from "lucide-react";
 import { siteConfig } from "@/config/site";
+import { formatDetailsSummary } from "@/lib/details";
+
+interface LeadNotification {
+  id: string;
+  lead_id: string;
+  contractor_name: string | null;
+  contractor_email: string | null;
+  contractor_phone: string | null;
+  channel: string;
+  status: string;
+  sent_at: string;
+}
+
+const NOTIFICATION_BADGE: Record<string, "green" | "amber" | "red" | "gray"> = {
+  sent: "green",
+  stub: "amber",
+  failed: "red",
+};
 
 export default function AdminPage() {
   const supabase = createClient();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [notifications, setNotifications] = useState<LeadNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
-      const [leadsRes, contractorsRes, quotesRes] = await Promise.all([
+      const [leadsRes, contractorsRes, quotesRes, notificationsRes] = await Promise.all([
         supabase.from("tq_leads").select("*, customer:tq_customers(*)").order("created_at", { ascending: false }),
         supabase.from("tq_contractors").select("*").order("created_at", { ascending: false }),
         supabase.from("tq_quotes").select("*, lead:tq_leads(*), contractor:tq_contractors(*)").order("created_at", { ascending: false }),
+        supabase.from("tq_lead_notifications").select("*").order("sent_at", { ascending: false }),
       ]);
 
       if (leadsRes.data) setLeads(leadsRes.data as Lead[]);
       if (contractorsRes.data) setContractors(contractorsRes.data as Contractor[]);
       if (quotesRes.data) setQuotes(quotesRes.data as Quote[]);
+      if (notificationsRes.data) setNotifications(notificationsRes.data as LeadNotification[]);
       setLoading(false);
     };
     load();
@@ -54,6 +76,9 @@ export default function AdminPage() {
     setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: status as Lead["status"] } : l)));
   };
 
+  const notificationsForLead = (leadId: string) => notifications.filter((n) => n.lead_id === leadId);
+  const contactedCount = (leadId: string) => new Set(notificationsForLead(leadId).map((n) => n.contractor_email)).size;
+
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-6 py-4">
@@ -73,46 +98,136 @@ export default function AdminPage() {
             <Card className="p-8 text-center text-gray-400 dark:bg-gray-800 dark:border-gray-700">No leads yet</Card>
           ) : (
             <div className="space-y-3">
-              {leads.map((lead) => (
-                <Card key={lead.id} className="p-4 flex items-center gap-4 dark:bg-gray-800 dark:border-gray-700">
-                  {lead.photo_url && (
-                    <img src={lead.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-white truncate">
-                      {lead.service_types.map((id) => siteConfig.serviceTypes.find((s) => s.id === id)?.label ?? id).join(", ")}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{lead.address}</p>
-                    <p className="text-xs text-gray-400">{new Date(lead.created_at).toLocaleString()}</p>
-                    {(lead.notifications_sent ?? 0) > 0 && (
-                      <p className="text-xs text-primary font-medium">📧 {lead.notifications_sent} contractor{(lead.notifications_sent ?? 0) === 1 ? "" : "s"} notified</p>
+              {leads.map((lead) => {
+                const isExpanded = expandedLeadId === lead.id;
+                const leadNotifications = notificationsForLead(lead.id);
+                const photos = lead.photo_urls && lead.photo_urls.length > 0 ? lead.photo_urls : lead.photo_url ? [lead.photo_url] : [];
+                const detailLines = lead.details ? formatDetailsSummary(lead.details) : [];
+
+                return (
+                  <Card key={lead.id} className="dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
+                    <div className="p-4 flex items-center gap-4">
+                      {lead.photo_url && (
+                        <img src={lead.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 dark:text-white truncate">
+                          {lead.service_types.map((id) => siteConfig.serviceTypes.find((s) => s.id === id)?.label ?? id).join(", ")}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{lead.address}</p>
+                        <p className="text-xs text-gray-400">{new Date(lead.created_at).toLocaleString()}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400" title="Contractors contacted">
+                        <Users size={14} /> {contactedCount(lead.id)}
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <select
+                          value={lead.status}
+                          onChange={(e) => updateLeadStatus(lead.id, e.target.value)}
+                          className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm"
+                        >
+                          <option value="new">New</option>
+                          <option value="quoted">Quoted</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                        <button
+                          onClick={async () => {
+                            const res = await fetch(`/api/notifications/send-lead-alerts?leadId=${lead.id}`);
+                            const data = await res.json();
+                            alert(`Sent ${data.sent ?? 0} notifications${data.errors?.length ? ` — errors: ${data.errors.join(", ")}` : ""}`);
+                            window.location.reload();
+                          }}
+                          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-200 dark:border-gray-600 transition-colors"
+                          title="Manually resend lead alerts to contractors"
+                        >
+                          🔄 Resend Alerts
+                        </button>
+                        <button
+                          onClick={() => setExpandedLeadId(isExpanded ? null : lead.id)}
+                          className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300"
+                          title="View full details"
+                          data-testid="lead-expand-toggle"
+                        >
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t border-gray-100 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900/40 space-y-5" data-testid="lead-expanded-detail">
+                        {/* Photos */}
+                        {photos.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Photos</p>
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {photos.map((url, i) => (
+                                <img key={i} src={url} alt={`Photo ${i + 1}`} className="w-20 h-20 object-cover rounded-lg flex-shrink-0" />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Details */}
+                        {detailLines.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Job Details</p>
+                            <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                              {detailLines.map((line) => <li key={line}>{line}</li>)}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Contact */}
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Customer Contact</p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            {lead.customer?.name ?? "Unknown"}
+                            {lead.customer?.phone && <> · <a href={`tel:${lead.customer.phone}`} className="text-primary hover:underline">{lead.customer.phone}</a></>}
+                            {lead.customer?.email && <> · <a href={`mailto:${lead.customer.email}`} className="text-primary hover:underline">{lead.customer.email}</a></>}
+                          </p>
+                        </div>
+
+                        {/* Notification log */}
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                            Contractors Contacted ({leadNotifications.length})
+                          </p>
+                          {leadNotifications.length === 0 ? (
+                            <p className="text-sm text-gray-400">No contractors have been notified for this lead yet.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {leadNotifications.map((n) => (
+                                <div key={n.id} className="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 border border-gray-100 dark:border-gray-700 text-sm">
+                                  <span className="font-medium text-gray-900 dark:text-white">{n.contractor_name ?? "Unknown"}</span>
+                                  <Badge variant={NOTIFICATION_BADGE[n.status] ?? "gray"}>{n.status}</Badge>
+                                  <span className="text-xs text-gray-400">{new Date(n.sent_at).toLocaleString()}</span>
+                                  <div className="flex items-center gap-2 ml-auto">
+                                    {n.contractor_email && (
+                                      <a href={`mailto:${n.contractor_email}`} className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20" title={`Email ${n.contractor_email}`}>
+                                        <Mail size={14} />
+                                      </a>
+                                    )}
+                                    {n.contractor_phone && (
+                                      <>
+                                        <a href={`tel:${n.contractor_phone}`} className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20" title={`Call ${n.contractor_phone}`}>
+                                          <Phone size={14} />
+                                        </a>
+                                        <a href={`sms:${n.contractor_phone}`} className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20" title={`Text ${n.contractor_phone}`}>
+                                          <MessageCircle size={14} />
+                                        </a>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     )}
-                  </div>
-                  <div className="flex gap-2 items-center">
-                    <select
-                      value={lead.status}
-                      onChange={(e) => updateLeadStatus(lead.id, e.target.value)}
-                      className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm"
-                    >
-                      <option value="new">New</option>
-                      <option value="quoted">Quoted</option>
-                      <option value="closed">Closed</option>
-                    </select>
-                    <button
-                      onClick={async () => {
-                        const res = await fetch(`/api/notifications/send-lead-alerts?leadId=${lead.id}`);
-                        const data = await res.json();
-                        alert(`Sent ${data.sent ?? 0} notifications${data.errors?.length ? ` — errors: ${data.errors.join(", ")}` : ""}`);
-                        window.location.reload();
-                      }}
-                      className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-200 dark:border-gray-600 transition-colors"
-                      title="Manually resend lead alerts to contractors"
-                    >
-                      🔄 Resend Alerts
-                    </button>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </section>
