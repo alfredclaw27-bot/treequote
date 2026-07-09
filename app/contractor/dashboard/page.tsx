@@ -9,9 +9,22 @@ import { siteConfig } from "@/config/site";
 import { MOCK_LEADS, MOCK_QUOTES } from "@/lib/mock-data";
 import { isDemoMode, getDemoUnlockedLeadIds, getDemoCredits, getDemoQuotes, exitDemoMode } from "@/lib/demo";
 import type { Lead, Quote } from "@/types";
+import type { ContractorMatchProfile } from "@/lib/lead-fit";
 import { LayoutDashboard, MessageSquare, User, LogOut, Sparkles } from "lucide-react";
 
 type Tab = "leads" | "quotes" | "account";
+
+const DEMO_CONTRACTOR_PROFILE: ContractorMatchProfile = {
+  specialties: ["removal", "trimming", "stump"],
+  bucketReach: "50_75ft",
+  crewSize: "3-4",
+  equipment: ["stump_grinder", "chipper", "climbing_gear"],
+};
+
+const DEMO_CONTRACTOR_LOCATION = {
+  lat: 33.749,
+  lng: -84.388,
+};
 
 export default function ContractorDashboardPage() {
   const supabase = createClient();
@@ -20,12 +33,14 @@ export default function ContractorDashboardPage() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [demo, setDemo] = useState(false);
+  const [contractorProfile, setContractorProfile] = useState<ContractorMatchProfile | undefined>(undefined);
   const [user, setUser] = useState<{ email?: string; business_name?: string; lead_credits?: number; is_founding?: boolean } | null>(null);
 
   useEffect(() => {
     const load = async () => {
       if (isDemoMode()) {
         setDemo(true);
+        setContractorProfile(DEMO_CONTRACTOR_PROFILE);
         const unlockedIds = new Set(getDemoUnlockedLeadIds());
         setLeads(MOCK_LEADS.map((l) => ({ ...l, unlocked: unlockedIds.has(l.id), unlock_count: unlockedIds.has(l.id) ? 1 : 0 })));
         setQuotes([...(getDemoQuotes() as unknown as Quote[]), ...MOCK_QUOTES]);
@@ -56,6 +71,12 @@ export default function ContractorDashboardPage() {
         business_name: contractor?.business_name,
         lead_credits: contractor?.lead_credits ?? 0,
         is_founding: contractor?.is_founding ?? false,
+      });
+      setContractorProfile({
+        specialties: contractor?.specialties ?? [],
+        bucketReach: contractor?.equipment?.bucketReach,
+        crewSize: contractor?.equipment?.crewSize,
+        equipment: contractor?.equipment?.equipment ?? [],
       });
       setLeads(leadsRes.leads ?? []);
       if (quotesRes.data) setQuotes(quotesRes.data as Quote[]);
@@ -154,6 +175,8 @@ export default function ContractorDashboardPage() {
                   key={lead.id}
                   lead={lead}
                   showQuoteButton={lead.status !== "closed"}
+                  contractorProfile={contractorProfile}
+                  contractorLocation={demo ? DEMO_CONTRACTOR_LOCATION : undefined}
                   onQuote={() => (window.location.href = `/contractor/quote/${lead.id}`)}
                 />
               ))

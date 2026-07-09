@@ -54,5 +54,7 @@ test.describe("Contractor Portal", () => {
     await expect(page).toHaveURL(/\/contractor\/dashboard/);
     await expect(page.locator("text=Demo mode")).toBeVisible();
     await expect(page.locator("text=Available Leads")).toBeVisible();
+    await expect(page.locator("[data-testid='lead-fit-summary']").first()).toContainText("Why this fits");
+    await expect(page.locator("[data-testid='lead-fit-summary']").first()).toContainText("Strong specialty match");
   });
 });
