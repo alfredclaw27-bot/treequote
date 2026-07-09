@@ -149,6 +149,10 @@ export interface SiteConfig {
   /** Small reassurance/urgency copy woven into the submit wizard. */
   wizardMicrocopy: {
     reviewReassurance: string;
+    /** Shown at the very top of the wizard (Photos step) — sets expectations up front. */
+    momentumLine: string;
+    /** Shown on the Contact step — reassures before asking for personal info. */
+    contactTrustLine: string;
   };
 
   contractorPitch: {
@@ -204,6 +208,10 @@ export interface SiteConfig {
     quoteReceivedSubject: string;
     quoteAcceptedSubject: string;
     adminNewLeadSubjectPrefix: string;
+    /** Shown on /submitted when the customer gave an email and the app has a real backend configured. */
+    submittedEmailConfirmationLine: string;
+    /** Shown on /submitted otherwise (no email given, or zero-env-keys demo mode where no email can actually be sent). */
+    submittedNoEmailLine: string;
   };
 
   features: {
@@ -295,7 +303,9 @@ export const siteConfig: SiteConfig = {
   ],
 
   wizardMicrocopy: {
-    reviewReassurance: "Local pros are ready — most customers hear back the same day.",
+    reviewReassurance: "You're one click from real quotes — local pros usually respond the same day.",
+    momentumLine: "Takes about 2 minutes. Most of it's multiple choice.",
+    contactTrustLine: "Your info only goes to pros you choose to hear from — never sold, never spammed.",
   },
 
   contractorPitch: {
@@ -470,6 +480,20 @@ export const siteConfig: SiteConfig = {
       ],
     },
     {
+      key: "benefitGoal",
+      label: "What will it feel like when this job's done?",
+      helpText: "Optional — pick whatever fits. Helps pros understand what matters most to you.",
+      kind: "multiselect",
+      options: [
+        { value: "stop_worrying", label: "🧘 Finally stop worrying about it" },
+        { value: "family_safety", label: "🛡️ Peace of mind for my family's safety" },
+        { value: "proud_space", label: "🏡 A space I'm actually proud to show off" },
+        { value: "protect_value", label: "💰 Protect (or boost) my home's value" },
+        { value: "todo_list", label: "✅ One less thing on my to-do list" },
+        { value: "enjoy_again", label: "😌 Get to actually enjoy my yard again" },
+      ],
+    },
+    {
       key: "notes",
       label: "Additional notes",
       kind: "textarea",
@@ -494,6 +518,9 @@ export const siteConfig: SiteConfig = {
     quoteReceivedSubject: "You got a new quote!",
     quoteAcceptedSubject: "A customer accepted your quote!",
     adminNewLeadSubjectPrefix: "New lead:",
+    submittedEmailConfirmationLine:
+      "📧 Confirmation email sent — check your inbox for your confirmation link and your quotes as they arrive.",
+    submittedNoEmailLine: "Your request is in — track quotes at the link below.",
   },
 
   features: {

@@ -7,10 +7,16 @@ import { siteConfig } from "@/config/site";
 export default async function SubmittedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ leadId?: string; ref?: string }>;
+  searchParams: Promise<{ leadId?: string; ref?: string; email?: string }>;
 }) {
   const params = await searchParams;
   const leadId = params.leadId ?? params.ref;
+  const emailProvided = params.email === "1";
+  // Demo-mode leads (zero env keys — no real backend, no email provider) are
+  // always minted with a "demo-" prefixed id (see app/submit/page.tsx). No
+  // email actually goes out in that mode even if one was collected.
+  const isNoBackendDemo = !!leadId && leadId.startsWith("demo-");
+  const emailWasSent = emailProvided && !isNoBackendDemo;
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-6 py-12">
@@ -26,6 +32,18 @@ export default async function SubmittedPage({
           <p className="text-gray-500 dark:text-gray-400">
             Your request has been submitted. Contractors in your area have been notified.
           </p>
+        </div>
+
+        <div
+          className={`rounded-xl p-4 text-sm font-medium ${
+            emailWasSent
+              ? "bg-primary/10 text-primary-dark dark:text-primary"
+              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+          }`}
+        >
+          {emailWasSent
+            ? siteConfig.emailCopy.submittedEmailConfirmationLine
+            : siteConfig.emailCopy.submittedNoEmailLine}
         </div>
 
         {leadId && (

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -8,7 +8,7 @@ import { ServiceSelector } from "@/components/ServiceSelector";
 import { LocationInput } from "@/components/LocationInput";
 import { DetailsForm } from "@/components/DetailsForm";
 import { formatDetailsSummary } from "@/lib/details";
-import { isSupabaseConfigured, saveDemoLead } from "@/lib/demo";
+import { isSupabaseConfigured, saveDemoLead, makeStorablePhotoUrls } from "@/lib/demo";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { siteConfig } from "@/config/site";
@@ -32,6 +32,9 @@ export default function SubmitPage() {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [contact, setContact] = useState({ name: "", phone: "", email: "" });
+  // Reported by DetailsForm so the top progress bar can subdivide step 2
+  // ("Question 3 of 8" etc) into its own sub-progress.
+  const [detailsProgress, setDetailsProgress] = useState({ index: 0, total: 1 });
 
   const handleAddressChange = (addr: string, coords?: { lat: number; lon: number }) => {
     setAddress(addr);
@@ -39,15 +42,18 @@ export default function SubmitPage() {
     setLongitude(coords?.lon ?? null);
   };
 
-  const requiredDetailFields = siteConfig.detailFields.filter((f) => f.required);
+  const handleDetailsProgress = useCallback((index: number, total: number) => {
+    setDetailsProgress({ index, total: Math.max(total, 1) });
+  }, []);
+
+  const handleDetailsComplete = useCallback(() => setStep(3), []);
+  const handleDetailsBack = useCallback(() => setStep(1), []);
 
   const canNext = () => {
     if (step === 0) return photoUrls.length > 0;
     if (step === 1) return serviceTypes.length > 0;
-    if (step === 2) return requiredDetailFields.every((f) => {
-      const v = details[f.key];
-      return v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0);
-    });
+    // Step 2 (Details) drives its own navigation via DetailsForm's
+    // Back/Next — the generic wizard nav below is hidden for that step.
     if (step === 3) return address.length > 5;
     if (step === 4) return contact.name && contact.phone;
     return true;
@@ -61,20 +67,34 @@ export default function SubmitPage() {
     // instead of failing against the placeholder Supabase URL.
     if (!isSupabaseConfigured()) {
       const demoId = `demo-${Date.now().toString(36)}`;
-      saveDemoLead({
-        id: demoId,
-        photo_url: photoUrls[0] ?? "",
-        photo_urls: photoUrls,
-        service_types: serviceTypes,
-        address,
-        latitude,
-        longitude,
-        details,
-        status: "new",
-        created_at: new Date().toISOString(),
-        customer: contact,
-      });
-      router.push(`/submitted?ref=${demoId}`);
+      const emailParam = contact.email ? "1" : "0";
+      // Wrapped end-to-end: with real phone photos, PhotoUploader's
+      // preview fallback (used whenever Supabase storage isn't configured)
+      // can be a multi-MB base64 data URL. Persisting that straight to
+      // localStorage used to throw an uncaught QuotaExceededError here,
+      // which left `submitting` stuck true and the button stuck at
+      // "Submitting..." forever. Demo-mode persistence is a nice-to-have —
+      // losing it is fine, hanging the customer is not.
+      try {
+        const { photo_urls, photo_count } = await makeStorablePhotoUrls(photoUrls);
+        saveDemoLead({
+          id: demoId,
+          photo_url: photo_urls[0] ?? "",
+          photo_urls,
+          photo_count,
+          service_types: serviceTypes,
+          address,
+          latitude,
+          longitude,
+          details,
+          status: "new",
+          created_at: new Date().toISOString(),
+          customer: contact,
+        });
+      } catch (err) {
+        console.error("Demo lead save failed (continuing to confirmation anyway):", err);
+      }
+      router.push(`/submitted?ref=${demoId}&email=${emailParam}`);
       return;
     }
 
@@ -137,7 +157,7 @@ export default function SubmitPage() {
         }),
       }).catch(() => {});
 
-      router.push(`/submitted?ref=${lead.id}`);
+      router.push(`/submitted?ref=${lead.id}&email=${contact.email ? "1" : "0"}`);
     } catch {
       setError("Something went wrong. Please try again.");
       setSubmitting(false);
@@ -153,33 +173,44 @@ export default function SubmitPage() {
           </Link>
           <span className="text-sm text-gray-400">Step {step + 1} of {STEPS.length}</span>
         </div>
-        {/* Progress */}
+        {/* Progress — step 2 (Details) subdivides its segment by sub-question progress */}
         <div className="flex gap-1 px-6 pb-3">
-          {STEPS.map((_, i) => (
-            <div
-              key={i}
-              data-testid="progress-step"
-              className={`h-1 flex-1 rounded-full transition-all ${i <= step ? "bg-primary" : "bg-gray-200 dark:bg-gray-700"}`}
-            />
-          ))}
+          {STEPS.map((_, i) => {
+            let fillPct = 0;
+            if (i < step) fillPct = 100;
+            else if (i === step) {
+              fillPct = i === 2 ? Math.round(((detailsProgress.index + 1) / detailsProgress.total) * 100) : 100;
+            }
+            return (
+              <div
+                key={i}
+                data-testid="progress-step"
+                className="h-1 flex-1 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden"
+              >
+                <div className="h-full bg-primary transition-all" style={{ width: `${fillPct}%` }} />
+              </div>
+            );
+          })}
         </div>
       </header>
 
       <div className="max-w-lg mx-auto px-6 py-8">
         {/* Step indicator */}
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{STEPS[step]}</h1>
-        <p className="text-gray-400 text-sm mb-6">
-          {step === 0 && `Upload photos of the ${siteConfig.itemNounSingular}(s) you need service on`}
-          {step === 1 && "Select the type of service you need"}
-          {step === 2 && `Tell us about your ${siteConfig.itemNounSingular} and the job`}
-          {step === 3 && "Where is the job located?"}
-          {step === 4 && "How can contractors reach you?"}
-          {step === 5 && "Review and submit your request"}
-        </p>
+        {step !== 2 && (
+          <p className="text-gray-400 text-sm mb-6">
+            {step === 0 && `Upload photos of the ${siteConfig.itemNounSingular}(s) you need service on`}
+            {step === 1 && "Select the type of service you need"}
+            {step === 3 && "Where is the job located?"}
+            {step === 4 && "How can contractors reach you?"}
+            {step === 5 && "Review and submit your request"}
+          </p>
+        )}
 
         {/* Step 0: Photos */}
         {step === 0 && (
           <div>
+            <p className="text-xs text-gray-400 mb-4">{siteConfig.wizardMicrocopy.momentumLine}</p>
             <PhotoUploader onUploaded={(urls) => setPhotoUrls(urls)} currentUrls={photoUrls} />
             {photoUrls.length > 0 && (
               <p className="text-xs text-gray-400 mt-2 text-center">{photoUrls.length} photo{photoUrls.length !== 1 ? "s" : ""} selected</p>
@@ -192,9 +223,15 @@ export default function SubmitPage() {
           <ServiceSelector selected={serviceTypes} onChange={setServiceTypes} />
         )}
 
-        {/* Step 2: Details (config-driven) */}
+        {/* Step 2: Details (config-driven, one question per page) */}
         {step === 2 && (
-          <DetailsForm values={details} onChange={setDetails} />
+          <DetailsForm
+            values={details}
+            onChange={setDetails}
+            onComplete={handleDetailsComplete}
+            onBack={handleDetailsBack}
+            onProgress={handleDetailsProgress}
+          />
         )}
 
         {/* Step 3: Location */}
@@ -235,6 +272,7 @@ export default function SubmitPage() {
                 className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
+            <p className="text-xs text-gray-400">{siteConfig.wizardMicrocopy.contactTrustLine}</p>
           </div>
         )}
 
@@ -284,7 +322,8 @@ export default function SubmitPage() {
           </div>
         )}
 
-        {/* Navigation */}
+        {/* Navigation — step 2 (Details) owns its own Back/Next inside DetailsForm */}
+        {step !== 2 && (
         <div className="flex gap-3 mt-8">
           {step > 0 ? (
             <Button
@@ -317,6 +356,7 @@ export default function SubmitPage() {
             </Button>
           )}
         </div>
+        )}
       </div>
     </main>
   );
