@@ -10,7 +10,7 @@ import { siteConfig } from "@/config/site";
 export default function LandingPage() {
   const { resolvedTheme, setTheme } = useTheme();
   const [customerCount] = useState(847);
-  const { brand, hero, howItWorksCustomer, trustSignals, customerBanner, contractorPitch, socialProof, footer } = siteConfig;
+  const { brand, hero, howItWorksCustomer, trustSignals, customerBanner, contractorPitch, socialProof, footer, emotionalBenefits } = siteConfig;
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
@@ -74,6 +74,19 @@ export default function LandingPage() {
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
             <p className="text-white font-medium">{hero.heroImageCaption}</p>
           </div>
+        </div>
+      </section>
+
+      {/* Emotional benefits — why this actually matters, not just what it does */}
+      <section className="px-6 max-w-4xl mx-auto mb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {emotionalBenefits.map(({ icon, title, desc }) => (
+            <Card key={title} className="p-6 text-center dark:bg-gray-800 dark:border-gray-700">
+              <div className="text-4xl mb-3">{icon}</div>
+              <h3 className="font-bold text-gray-900 dark:text-white mb-2">{title}</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{desc}</p>
+            </Card>
+          ))}
         </div>
       </section>
 
