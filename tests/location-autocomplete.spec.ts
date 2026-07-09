@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import path from "path";
+import { completeDetailsStep, goToDetailsStep } from "./utils/wizard";
 
 const PHOTON_RESPONSE = {
   features: [
@@ -24,24 +25,20 @@ const PHOTON_RESPONSE = {
   ],
 };
 
-/** Advances the submit wizard from step 0 (Photos) through step 3 (Location). */
+/**
+ * Advances the submit wizard from step 0 (Photos) through the Details step
+ * (now a one-question-per-page flow — see components/DetailsForm.tsx) to
+ * Location, answering only the three required questions and skipping the
+ * rest via their Next buttons.
+ */
 async function goToLocationStep(page: import("@playwright/test").Page) {
-  await page.goto("/submit");
+  await goToDetailsStep(page, path.join(__dirname, "fixtures", "test-photo.png"));
 
-  // Step 0: Photos — inject a fixture image directly into the hidden input.
-  await page.locator("input[type='file']").setInputFiles(path.join(__dirname, "fixtures", "test-photo.png"));
-  await expect(page.locator("button:has-text('Next')")).toBeEnabled();
-  await page.click("button:has-text('Next')");
-
-  // Step 1: Service
-  await page.click("button:has-text('Tree Removal')");
-  await page.click("button:has-text('Next')");
-
-  // Step 2: Details — fill the required selects.
-  await page.click("button:has-text('Under 20 ft')");
-  await page.click("button:has-text('Oak')");
-  await page.click("button:has-text('ASAP / Emergency')");
-  await page.click("button:has-text('Next')");
+  await completeDetailsStep(page, {
+    "Approximate tree height": "Under 20 ft",
+    "Tree type": "Oak",
+    "How soon do you need this done?": "ASAP / Emergency",
+  });
 
   await expect(page.locator("h1")).toHaveText("Location");
 }
