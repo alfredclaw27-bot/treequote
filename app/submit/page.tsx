@@ -29,9 +29,15 @@ export default function SubmitPage() {
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
   const [details, setDetails] = useState<LeadDetails>({});
   const [address, setAddress] = useState("");
-  const [latitude] = useState<number | null>(null);
-  const [longitude] = useState<number | null>(null);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [contact, setContact] = useState({ name: "", phone: "", email: "" });
+
+  const handleAddressChange = (addr: string, coords?: { lat: number; lon: number }) => {
+    setAddress(addr);
+    setLatitude(coords?.lat ?? null);
+    setLongitude(coords?.lon ?? null);
+  };
 
   const requiredDetailFields = siteConfig.detailFields.filter((f) => f.required);
 
@@ -61,6 +67,8 @@ export default function SubmitPage() {
         photo_urls: photoUrls,
         service_types: serviceTypes,
         address,
+        latitude,
+        longitude,
         details,
         status: "new",
         created_at: new Date().toISOString(),
@@ -191,7 +199,7 @@ export default function SubmitPage() {
 
         {/* Step 3: Location */}
         {step === 3 && (
-          <LocationInput value={address} onChange={(addr) => { setAddress(addr); }} />
+          <LocationInput value={address} onChange={handleAddressChange} />
         )}
 
         {/* Step 4: Contact */}
@@ -266,7 +274,7 @@ export default function SubmitPage() {
               <p className="text-sm text-gray-500 dark:text-gray-400">{contact.phone}{contact.email && ` · ${contact.email}`}</p>
             </Card>
             <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-sm text-primary-dark dark:text-primary">
-              We&apos;ll notify local contractors who match your job. Expect quotes within 24 hours.
+              {siteConfig.wizardMicrocopy.reviewReassurance}
             </div>
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
