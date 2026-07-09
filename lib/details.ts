@@ -1,6 +1,18 @@
 import { siteConfig } from "@/config/site";
 import type { LeadDetails } from "@/types";
 
+/**
+ * Reduces a full street address down to "city, ST zip" (everything after
+ * the first comma). Used to keep the exact street address private in
+ * contractor-facing alerts/UI until a lead is unlocked.
+ */
+export function maskAddressToCity(address?: string | null): string {
+  if (!address) return "";
+  const parts = address.split(",");
+  if (parts.length <= 1) return address.trim();
+  return parts.slice(1).join(",").trim();
+}
+
 /** Human-readable summary of a details object, for review screens & emails */
 export function formatDetailsSummary(details: LeadDetails): string[] {
   const lines: string[] = [];

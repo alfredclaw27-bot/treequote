@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { sendQuoteReceivedEmail } from "@/lib/email";
 
 export async function GET(req: NextRequest) {
   const supabase = await createServiceClient();
@@ -20,7 +21,19 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data);
 }
 
+/**
+ * POST /api/quotes
+ * Submits a contractor's quote on a lead. Folds the insert + the
+ * quote-received customer notification into one server-side call (the quote
+ * form used to insert directly from the browser).
+ */
 export async function POST(req: NextRequest) {
+  const authClient = await createClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const supabase = await createServiceClient();
   const body = await req.json();
 
@@ -28,6 +41,10 @@ export async function POST(req: NextRequest) {
 
   if (!lead_id || !contractor_id || !amount) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  if (contractor_id !== user.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
   const { data, error } = await supabase
@@ -47,6 +64,29 @@ export async function POST(req: NextRequest) {
 
   // Update lead status
   await supabase.from("tq_leads").update({ status: "quoted" }).eq("id", lead_id);
+
+  // Fire-and-forget: let the customer know a quote came in. No-ops
+  // gracefully without RESEND_API_KEY (see lib/email.ts).
+  (async () => {
+    try {
+      const [{ data: lead }, { data: contractor }] = await Promise.all([
+        supabase.from("tq_leads").select("service_types, customer:tq_customers(name, email)").eq("id", lead_id).single(),
+        supabase.from("tq_contractors").select("business_name").eq("id", contractor_id).single(),
+      ]);
+      const customer = lead?.customer as unknown as { name?: string; email?: string } | null;
+      if (customer?.email) {
+        await sendQuoteReceivedEmail({
+          to: customer.email,
+          customerName: customer.name || "there",
+          leadId: lead_id,
+          serviceTypes: lead?.service_types ?? [],
+          contractorName: contractor?.business_name || "A contractor",
+        });
+      }
+    } catch (e) {
+      console.error("[Quotes] Failed to send quote-received email:", e);
+    }
+  })();
 
   return NextResponse.json(data, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendLeadAlerts } from "@/lib/notifications";
+import { sendAdminNewLeadEmail } from "@/lib/email";
 
 /**
  * POST /api/notifications/send-lead-alerts
@@ -18,10 +19,10 @@ export async function POST(req: NextRequest) {
 
   const supabase = await createServiceClient();
 
-  // Fetch the lead
+  // Fetch the lead (with customer contact, for the unmasked admin email below)
   const { data: lead, error: leadError } = await supabase
     .from("tq_leads")
-    .select("*")
+    .select("*, customer:tq_customers(*)")
     .eq("id", leadId)
     .single();
 
@@ -40,6 +41,16 @@ export async function POST(req: NextRequest) {
       notification_targets: result.contractors,
     })
     .eq("id", leadId);
+
+  // Every new-lead submission also alerts the site owner (unmasked, full
+  // details) so they can follow up manually. No-ops silently without
+  // ADMIN_EMAIL. Reuses the contractor list `sendLeadAlerts` already
+  // matched instead of re-querying.
+  sendAdminNewLeadEmail({
+    lead,
+    customer: lead.customer,
+    matchedContractors: result.matchedContractors,
+  }).catch((e) => console.error("[LeadAlert] Failed to send admin new-lead email:", e));
 
   return NextResponse.json({
     success: true,

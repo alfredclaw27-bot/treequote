@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { maskCustomer } from "@/lib/masking";
+import { maskAddressToCity } from "@/lib/details";
 import { getCompletedUnlockCount, contractorHasUnlocked } from "@/lib/lead-access";
 import { siteConfig } from "@/config/site";
 import type { Lead } from "@/types";
@@ -41,6 +42,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json({
     lead: {
       ...typedLead,
+      // Full street address is only revealed once a contractor has unlocked
+      // the lead — before that, only city/state goes out over the wire.
+      address: unlocked ? typedLead.address : maskAddressToCity(typedLead.address),
       unlocked,
       unlock_count: unlockCount,
       is_full: unlockCount >= siteConfig.maxContractorsPerLead,

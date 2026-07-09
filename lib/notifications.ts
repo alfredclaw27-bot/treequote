@@ -2,7 +2,7 @@ import { Resend } from "resend";
 import seedContractors from "@/data/contractors-seed.json";
 import { createServiceClient } from "@/lib/supabase/server";
 import { siteConfig } from "@/config/site";
-import { formatDetailsSummary } from "@/lib/details";
+import { formatDetailsSummary, maskAddressToCity } from "@/lib/details";
 import type { Lead } from "@/types";
 
 function getResendClient() {
@@ -67,10 +67,38 @@ export interface NotificationResult {
   skipped: number;
   errors: string[];
   contractors: string[];
+  /** Full matched-contractor records (name/email/phone) — cheap to reuse for the admin new-lead email instead of re-querying. */
+  matchedContractors: MatchableContractor[];
+}
+
+/**
+ * Records one row per attempted contractor notification in
+ * `tq_lead_notifications`, so admins can see who was contacted, when, and
+ * with what result — including in stub mode (Supabase up, Resend not).
+ * Best-effort: logging failures never block the actual alert flow.
+ */
+async function logNotification(params: {
+  leadId: string;
+  contractor: MatchableContractor;
+  status: "sent" | "failed" | "stub";
+}) {
+  try {
+    const supabase = await createServiceClient();
+    await supabase.from("tq_lead_notifications").insert({
+      lead_id: params.leadId,
+      contractor_name: params.contractor.name,
+      contractor_email: params.contractor.email,
+      contractor_phone: params.contractor.phone ?? null,
+      channel: "email",
+      status: params.status,
+    });
+  } catch (err) {
+    console.error("[LeadAlert] Failed to log notification:", err);
+  }
 }
 
 export async function sendLeadAlerts(lead: Lead): Promise<NotificationResult> {
-  const result: NotificationResult = { sent: 0, skipped: 0, errors: [], contractors: [] };
+  const result: NotificationResult = { sent: 0, skipped: 0, errors: [], contractors: [], matchedContractors: [] };
   const resend = getResendClient();
 
   const matched = await getMatchedContractors(lead);
@@ -80,6 +108,7 @@ export async function sendLeadAlerts(lead: Lead): Promise<NotificationResult> {
   }
 
   const contractorsToNotify = matched.slice(0, siteConfig.maxContractorsPerLead * 3); // notify a wider pool than can unlock
+  result.matchedContractors = contractorsToNotify;
 
   if (!resend) {
     // Stub mode: just report matched contractors, don't crash without RESEND_API_KEY
@@ -87,6 +116,9 @@ export async function sendLeadAlerts(lead: Lead): Promise<NotificationResult> {
     result.contractors = contractorsToNotify.map((c) => c.email);
     result.errors.push("RESEND_API_KEY not configured — stub mode, no emails sent");
     console.log("[LeadAlert Stub] Would notify:", result.contractors);
+    await Promise.all(
+      contractorsToNotify.map((contractor) => logNotification({ leadId: lead.id, contractor, status: "stub" }))
+    );
     return result;
   }
 
@@ -94,6 +126,7 @@ export async function sendLeadAlerts(lead: Lead): Promise<NotificationResult> {
     .map((id) => siteConfig.serviceTypes.find((s) => s.id === id)?.label ?? id)
     .join(", ") || "New job";
   const detailsSummary = lead.details ? formatDetailsSummary(lead.details).join("\n") : "";
+  const cityLabel = maskAddressToCity(lead.address);
 
   for (const contractor of contractorsToNotify) {
     const emailHtml = buildEmailHtml({ lead, contractor, serviceLabel, detailsSummary });
@@ -102,19 +135,22 @@ export async function sendLeadAlerts(lead: Lead): Promise<NotificationResult> {
       const { error } = await resend.emails.send({
         from: `${siteConfig.brand.name} Alerts <${siteConfig.emailCopy.alertsFromEmail}>`,
         to: contractor.email,
-        subject: `${siteConfig.emailCopy.leadAlertSubjectPrefix}${lead.address ? ` — ${lead.address.split(",")[0]}` : ""} [${serviceLabel}]`,
+        subject: `${siteConfig.emailCopy.leadAlertSubjectPrefix}${cityLabel ? ` — ${cityLabel}` : ""} [${serviceLabel}]`,
         html: emailHtml,
         replyTo: siteConfig.emailCopy.replyToEmail,
       });
 
       if (error) {
         result.errors.push(`Failed to send to ${contractor.email}: ${error.message}`);
+        await logNotification({ leadId: lead.id, contractor, status: "failed" });
       } else {
         result.sent++;
         result.contractors.push(contractor.email);
+        await logNotification({ leadId: lead.id, contractor, status: "sent" });
       }
     } catch (err) {
       result.errors.push(`Exception sending to ${contractor.email}: ${String(err)}`);
+      await logNotification({ leadId: lead.id, contractor, status: "failed" });
     }
   }
 
@@ -218,7 +254,7 @@ function buildEmailHtml({ lead, contractor, serviceLabel, detailsSummary }: Emai
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <tr>
           <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; font-size: 13px; color: #6B7280; width: 120px;">Location</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; font-size: 14px; font-weight: 600; color: #111827;">${lead.address ?? "—"}</td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; font-size: 14px; font-weight: 600; color: #111827;">${maskAddressToCity(lead.address) || "—"} <span style="font-weight:400;color:#9CA3AF;">(exact address revealed after unlock)</span></td>
         </tr>
         ${detailsSummary ? `
         <tr>

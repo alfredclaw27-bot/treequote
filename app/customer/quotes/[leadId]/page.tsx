@@ -22,6 +22,7 @@ export default function CustomerQuotesPage() {
   const [lead, setLead] = useState<Lead | null>(null);
   const [quotes, setQuotes] = useState<(Quote & { contractor?: Contractor })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -43,6 +44,7 @@ export default function CustomerQuotesPage() {
         if (quotesData) setQuotes(quotesData as (Quote & { contractor?: Contractor })[]);
       } else {
         // Fall back to demo/mock lead so the confirmation link always works
+        setIsDemo(true);
         const mockLead = findMockLead(leadId) ?? (findDemoLead(leadId) as unknown as Lead | undefined);
         if (mockLead) setLead(mockLead);
         const demoQuotes = getDemoQuotes().filter((q) => q.lead_id === leadId);
@@ -54,7 +56,15 @@ export default function CustomerQuotesPage() {
   }, [leadId, supabase]);
 
   const handleAccept = async (quoteId: string) => {
-    await supabase.from("tq_quotes").update({ status: "accepted" }).eq("id", quoteId);
+    // Routed through an API route (rather than updating directly from the
+    // browser) so the quote-accepted contractor email can be sent server-side.
+    if (!isDemo) {
+      try {
+        await fetch(`/api/quotes/${quoteId}/accept`, { method: "POST" });
+      } catch (e) {
+        console.error("Failed to accept quote:", e);
+      }
+    }
     setQuotes((qs) => qs.map((q) => (q.id === quoteId ? { ...q, status: "accepted" as const } : q)));
   };
 

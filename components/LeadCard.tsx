@@ -4,12 +4,14 @@ import type { Lead } from "@/types";
 import { MapPin, Clock, Target, Lock, Unlock, User } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { maskCustomerName } from "@/lib/masking";
+import { maskAddressToCity } from "@/lib/details";
+import { calculateLeadFit, type ContractorMatchProfile } from "@/lib/lead-fit";
 
 interface LeadCardProps {
   lead: Lead;
   onQuote?: () => void;
   showQuoteButton?: boolean;
-  contractorSpecialties?: string[];
+  contractorProfile?: ContractorMatchProfile;
   contractorLocation?: { lat: number; lng: number };
 }
 
@@ -18,16 +20,6 @@ const STATUS_BADGE: Record<string, { label: string; variant: "green" | "blue" | 
   quoted: { label: "Quoted", variant: "blue" },
   closed: { label: "Closed", variant: "gray" },
 };
-
-// Match score based on service type overlap with contractor specialties
-function calcMatchScore(lead: Lead, specialties?: string[]): number {
-  if (!specialties || specialties.length === 0) return Math.floor(Math.random() * 30 + 70);
-  const leadTypes = new Set(lead.service_types);
-  const matchCount = leadTypes.intersection(new Set(specialties)).size;
-  if (matchCount === 0) return 55;
-  if (matchCount === leadTypes.size) return 95;
-  return 70 + matchCount * 8;
-}
 
 // Haversine distance in miles
 function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -38,22 +30,20 @@ function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): n
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export function LeadCard({ lead, onQuote, showQuoteButton = false, contractorSpecialties, contractorLocation }: LeadCardProps) {
+export function LeadCard({ lead, onQuote, showQuoteButton = false, contractorProfile, contractorLocation }: LeadCardProps) {
   const badge = STATUS_BADGE[lead.status] ?? STATUS_BADGE.new;
   const serviceLabels = lead.service_types
     .map((id) => siteConfig.serviceTypes.find((s) => s.id === id)?.label ?? id)
     .join(", ");
 
-  const matchScore = calcMatchScore(lead, contractorSpecialties);
-  const scoreColor = matchScore >= 85 ? "bg-primary/10 text-primary-dark" : matchScore >= 70 ? "bg-accent/10 text-accent-dark" : "bg-gray-100 text-gray-500";
-
-  const contractorLat = contractorLocation?.lat ?? 33.749;
-  const contractorLng = contractorLocation?.lng ?? -84.388;
-  const distance = lead.latitude && lead.longitude
-    ? calcDistance(contractorLat, contractorLng, lead.latitude, lead.longitude)
+  const distance = contractorLocation && lead.latitude && lead.longitude
+    ? calcDistance(contractorLocation.lat, contractorLocation.lng, lead.latitude, lead.longitude)
     : null;
+  const fit = calculateLeadFit(lead, contractorProfile, distance);
+  const scoreColor = fit.score >= 85 ? "bg-primary/10 text-primary-dark" : fit.score >= 70 ? "bg-accent/10 text-accent-dark" : "bg-gray-100 text-gray-500";
 
   const unlocked = lead.unlocked ?? false;
+  const displayAddress = unlocked ? lead.address : maskAddressToCity(lead.address);
 
   return (
     <Card className="overflow-hidden dark:bg-gray-800 dark:border-gray-700">
@@ -71,14 +61,14 @@ export function LeadCard({ lead, onQuote, showQuoteButton = false, contractorSpe
             <div className="flex items-center gap-2">
               <span className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${scoreColor}`}>
                 <Target size={12} />
-                {matchScore}%
+                {fit.score}% fit
               </span>
             </div>
           </div>
 
           <p className="font-semibold text-gray-900 dark:text-white mb-1">{serviceLabels}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-2">
-            <MapPin size={14} /> {lead.address}
+            <MapPin size={14} /> {displayAddress}
           </p>
 
           {/* Contact preview — masked until unlocked */}
@@ -111,6 +101,13 @@ export function LeadCard({ lead, onQuote, showQuoteButton = false, contractorSpe
               <Clock size={12} />
               {new Date(lead.created_at).toLocaleDateString()}
             </span>
+          </div>
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-900/60 px-3 py-2 mb-2" data-testid="lead-fit-summary">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Why this fits</p>
+            <p className="text-xs text-gray-600 dark:text-gray-300">{fit.reasons.join(" • ")}</p>
+            {fit.cautions.length > 0 && (
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">Watch-outs: {fit.cautions.join(" • ")}</p>
+            )}
           </div>
 
           {showQuoteButton && (

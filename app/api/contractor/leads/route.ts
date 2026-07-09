@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { maskCustomer } from "@/lib/masking";
+import { maskAddressToCity } from "@/lib/details";
 import { siteConfig } from "@/config/site";
 import type { Lead } from "@/types";
 
@@ -45,6 +46,7 @@ export async function GET() {
     const unlock_count = unlockCounts.get(lead.id) ?? 0;
     return {
       ...lead,
+      address: unlocked ? lead.address : maskAddressToCity(lead.address),
       unlocked,
       unlock_count,
       is_full: unlock_count >= siteConfig.maxContractorsPerLead,

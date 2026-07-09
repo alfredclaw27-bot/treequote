@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { ArrowLeft, MapPin, Clock, CreditCard, CheckCircle, Zap, Lock } from "lucide-react";
 import type { Lead } from "@/types";
 import { siteConfig, getLeadPriceCents } from "@/config/site";
-import { formatDetailsSummary } from "@/lib/details";
+import { formatDetailsSummary, maskAddressToCity } from "@/lib/details";
 import { findMockLead } from "@/lib/mock-data";
 import { isDemoMode, isDemoLeadUnlocked, unlockDemoLead, getDemoCredits, spendDemoCredit, saveDemoQuote } from "@/lib/demo";
 
@@ -70,7 +70,17 @@ function QuotePageContent() {
       try {
         const verifyRes = await fetch(`/api/contractor/verify-session?session_id=${sessionIdParam}&lead_id=${leadId}`);
         const verifyData = await verifyRes.json();
-        if (verifyData.hasAccess) setHasAccess(true);
+        if (verifyData.hasAccess) {
+          const reRes = await fetch(`/api/contractor/leads/${leadId}`);
+          if (reRes.ok) {
+            const reData = await reRes.json();
+            setLead(reData.lead);
+            setHasAccess(!!reData.lead?.unlocked);
+            setLeadCredits(reData.contractor?.lead_credits ?? 0);
+          } else {
+            setHasAccess(true);
+          }
+        }
       } catch (e) {
         console.error("Verify failed:", e);
       }
@@ -81,6 +91,23 @@ function QuotePageContent() {
   useEffect(() => {
     loadLead();
   }, [loadLead]);
+
+  // Re-fetch the lead after an unlock so contact info + the full street
+  // address (both masked pre-unlock) come back unmasked, without needing a
+  // full page reload.
+  const refreshLead = useCallback(async () => {
+    if (demo) return;
+    try {
+      const res = await fetch(`/api/contractor/leads/${leadId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setLead(data.lead);
+      setHasAccess(!!data.lead?.unlocked);
+      setLeadCredits(data.contractor?.lead_credits ?? leadCredits);
+    } catch (e) {
+      console.error("Refresh lead failed:", e);
+    }
+  }, [demo, leadId, leadCredits]);
 
   const handlePayment = async () => {
     setPaymentError("");
@@ -97,7 +124,7 @@ function QuotePageContent() {
       if (!res.ok) throw new Error(data.error || "Failed to create checkout session");
 
       if (data.already_paid) {
-        setHasAccess(true);
+        await refreshLead();
         return;
       }
 
@@ -135,8 +162,8 @@ function QuotePageContent() {
       if (res.status === 401) { router.push("/contractor/login"); return; }
       if (!res.ok) throw new Error(data.error || "Failed to unlock lead");
 
-      setHasAccess(true);
       setLeadCredits(data.remaining_credits ?? Math.max(0, leadCredits - 1));
+      await refreshLead();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to unlock lead. Please try again.";
       setPaymentError(message);
@@ -167,18 +194,24 @@ function QuotePageContent() {
       return;
     }
 
-    const { error } = await supabase.from("tq_quotes").insert({
-      lead_id: leadId,
-      contractor_id: user.id,
-      amount,
-      notes,
-      estimated_date: estimatedDate || null,
-      status: "pending",
+    // Routed through an API route (rather than inserting directly from the
+    // browser) so the quote-received customer email can be sent server-side.
+    const res = await fetch("/api/quotes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lead_id: leadId,
+        contractor_id: user.id,
+        amount,
+        notes,
+        estimated_date: estimatedDate || null,
+      }),
     });
 
-    if (error) throw error;
-
-    await supabase.from("tq_leads").update({ status: "quoted" }).eq("id", leadId);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to submit quote");
+    }
 
     router.push("/contractor/dashboard?tab=quotes");
   };
@@ -206,6 +239,9 @@ function QuotePageContent() {
   const showPaymentStep = !hasAccess;
   const showCanceledNotice = canceledParam === "true";
   const isFull = !!lead.is_full && !hasAccess;
+  // Non-demo leads already come back masked pre-unlock from the API; demo
+  // mode uses static mock data with a real address, so mask it client-side.
+  const preUnlockAddress = demo ? maskAddressToCity(lead.address) : lead.address;
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -232,7 +268,7 @@ function QuotePageContent() {
                   {lead.service_types.map((id) => siteConfig.serviceTypes.find((s) => s.id === id)?.label ?? id).join(", ")}
                 </h1>
                 <p className="text-gray-500 dark:text-gray-400 flex items-center gap-1 text-sm">
-                  <MapPin size={14} /> {lead.address}
+                  <MapPin size={14} /> {preUnlockAddress}
                 </p>
                 <p className="text-gray-400 flex items-center gap-1 text-xs mt-1">
                   <Clock size={12} /> {new Date(lead.created_at).toLocaleDateString()}
