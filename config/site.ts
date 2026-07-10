@@ -506,9 +506,12 @@ export const siteConfig: SiteConfig = {
 
   emailCopy: {
     fromName: "TreeQuote",
-    fromEmail: "hello@treequote.app",
-    alertsFromEmail: "alerts@treequote.app",
-    replyToEmail: "leads@treequote.app",
+    // Resend has no verified domain yet — onboarding@resend.dev is the only
+    // from-address it accepts. Swap these to @<your-domain> once a domain
+    // is verified at resend.com/domains.
+    fromEmail: "onboarding@resend.dev",
+    alertsFromEmail: "onboarding@resend.dev",
+    replyToEmail: "miketkapp@gmail.com",
     contractorApplicationSubject: "Your TreeQuote Contractor Application — Under Review",
     contractorApprovedSubject: "You're approved! Start receiving leads today",
     customerConfirmationSubject: "We got your request! Quotes incoming within 24 hours",
