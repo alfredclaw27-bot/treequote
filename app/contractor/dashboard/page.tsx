@@ -8,11 +8,14 @@ import { LeadCard } from "@/components/LeadCard";
 import { siteConfig } from "@/config/site";
 import { MOCK_LEADS, MOCK_QUOTES } from "@/lib/mock-data";
 import { isDemoMode, getDemoUnlockedLeadIds, getDemoCredits, getDemoQuotes, exitDemoMode } from "@/lib/demo";
+import { calculateLeadFit } from "@/lib/lead-fit";
 import type { Lead, Quote } from "@/types";
 import type { ContractorMatchProfile } from "@/lib/lead-fit";
 import { LayoutDashboard, MessageSquare, User, LogOut, Sparkles } from "lucide-react";
 
 type Tab = "leads" | "quotes" | "account";
+type LeadSort = "best-fit" | "newest";
+type LeadFilter = "all" | "new" | "unlocked";
 
 const DEMO_CONTRACTOR_PROFILE: ContractorMatchProfile = {
   specialties: ["removal", "trimming", "stump"],
@@ -26,6 +29,16 @@ const DEMO_CONTRACTOR_LOCATION = {
   lng: -84.388,
 };
 
+function calcDistanceMiles(origin: { lat: number; lng: number } | undefined, lead: Lead): number | null {
+  if (!origin || !lead.latitude || !lead.longitude) return null;
+
+  const R = 3958.8;
+  const dLat = (lead.latitude - origin.lat) * Math.PI / 180;
+  const dLng = (lead.longitude - origin.lng) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(origin.lat * Math.PI / 180) * Math.cos(lead.latitude * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export default function ContractorDashboardPage() {
   const supabase = createClient();
   const [tab, setTab] = useState<Tab>("leads");
@@ -35,6 +48,9 @@ export default function ContractorDashboardPage() {
   const [demo, setDemo] = useState(false);
   const [contractorProfile, setContractorProfile] = useState<ContractorMatchProfile | undefined>(undefined);
   const [user, setUser] = useState<{ email?: string; business_name?: string; lead_credits?: number; is_founding?: boolean } | null>(null);
+  const [leadSort, setLeadSort] = useState<LeadSort>("best-fit");
+  const [leadFilter, setLeadFilter] = useState<LeadFilter>("all");
+  const [serviceFilter, setServiceFilter] = useState<string>("all");
 
   useEffect(() => {
     const load = async () => {
@@ -101,6 +117,27 @@ export default function ContractorDashboardPage() {
     { id: "account" as Tab, label: "Account", icon: User, count: null },
   ];
 
+  const contractorLocation = demo ? DEMO_CONTRACTOR_LOCATION : undefined;
+  const serviceOptions = siteConfig.serviceTypes.filter((service) =>
+    leads.some((lead) => lead.service_types.includes(service.id))
+  );
+  const visibleLeads = leads
+    .filter((lead) => {
+      if (leadFilter === "new" && lead.status !== "new") return false;
+      if (leadFilter === "unlocked" && !lead.unlocked) return false;
+      if (serviceFilter !== "all" && !lead.service_types.includes(serviceFilter)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (leadSort === "newest") {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+
+      const aScore = calculateLeadFit(a, contractorProfile, calcDistanceMiles(contractorLocation, a)).score;
+      const bScore = calculateLeadFit(b, contractorProfile, calcDistanceMiles(contractorLocation, b)).score;
+      return bScore - aScore || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -158,10 +195,69 @@ export default function ContractorDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Available Leads</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{leads.length} leads in your area</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{visibleLeads.length} of {leads.length} leads in your area</p>
               </div>
               <Badge variant="amber">Up to {siteConfig.maxContractorsPerLead} contractors per lead</Badge>
             </div>
+
+            {!loading && leads.length > 0 && (
+              <Card className="p-4 dark:bg-gray-800 dark:border-gray-700" data-testid="lead-triage-controls">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { id: "all", label: "All leads" },
+                      { id: "new", label: "New only" },
+                      { id: "unlocked", label: "Unlocked" },
+                    ] as { id: LeadFilter; label: string }[]).map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setLeadFilter(option.id)}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                          leadFilter === option.id
+                            ? "bg-primary text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="text-sm text-gray-500 dark:text-gray-400">
+                      <span className="mb-1 block">Sort</span>
+                      <select
+                        value={leadSort}
+                        onChange={(e) => setLeadSort(e.target.value as LeadSort)}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/40 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        data-testid="lead-sort-select"
+                      >
+                        <option value="best-fit">Best fit</option>
+                        <option value="newest">Newest</option>
+                      </select>
+                    </label>
+
+                    <label className="text-sm text-gray-500 dark:text-gray-400">
+                      <span className="mb-1 block">Service</span>
+                      <select
+                        value={serviceFilter}
+                        onChange={(e) => setServiceFilter(e.target.value)}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/40 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        data-testid="lead-service-select"
+                      >
+                        <option value="all">All services</option>
+                        {serviceOptions.map((service) => (
+                          <option key={service.id} value={service.id}>
+                            {service.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             {loading ? (
               <div className="space-y-4">
@@ -170,13 +266,13 @@ export default function ContractorDashboardPage() {
                 ))}
               </div>
             ) : (
-              leads.map((lead) => (
+              visibleLeads.map((lead) => (
                 <LeadCard
                   key={lead.id}
                   lead={lead}
                   showQuoteButton={lead.status !== "closed"}
                   contractorProfile={contractorProfile}
-                  contractorLocation={demo ? DEMO_CONTRACTOR_LOCATION : undefined}
+                  contractorLocation={contractorLocation}
                   onQuote={() => (window.location.href = `/contractor/quote/${lead.id}`)}
                 />
               ))
@@ -186,6 +282,12 @@ export default function ContractorDashboardPage() {
               <Card className="p-12 text-center dark:bg-gray-800 dark:border-gray-700">
                 <p className="text-gray-400 text-lg mb-2">No leads yet</p>
                 <p className="text-gray-400 text-sm">Check back soon — customers are submitting requests daily.</p>
+              </Card>
+            )}
+
+            {leads.length > 0 && visibleLeads.length === 0 && !loading && (
+              <Card className="p-8 text-center dark:bg-gray-800 dark:border-gray-700">
+                <p className="text-sm text-gray-500 dark:text-gray-400">No leads match those filters right now.</p>
               </Card>
             )}
           </div>

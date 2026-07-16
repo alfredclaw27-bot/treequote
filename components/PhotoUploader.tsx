@@ -22,9 +22,7 @@ export function PhotoUploader({ onUploaded, currentUrls = [] }: PhotoUploaderPro
   const syncState = useCallback((updated: typeof photos) => {
     setPhotos(updated);
     const urls = updated.filter((p) => !p.uploading).map((p) => p.url);
-    if (urls.length > 0 || updated.length > 0) {
-      onUploaded(urls);
-    }
+    onUploaded(urls);
   }, [onUploaded]);
 
   const uploadFile = useCallback(async (file: File): Promise<string | null> => {
@@ -93,6 +91,9 @@ export function PhotoUploader({ onUploaded, currentUrls = [] }: PhotoUploaderPro
       if (allDone) setUploading(false);
       onUploaded(current.filter((p) => !p.uploading).map((p) => p.url));
     }
+
+    // Allow selecting the same file again after removing it or after a failed upload.
+    if (inputRef.current) inputRef.current.value = "";
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -150,6 +151,7 @@ export function PhotoUploader({ onUploaded, currentUrls = [] }: PhotoUploaderPro
                   <button
                     type="button"
                     onClick={() => removePhoto(i)}
+                    aria-label={`Remove photo ${i + 1}`}
                     className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white transition-colors"
                   >
                     <X size={12} />

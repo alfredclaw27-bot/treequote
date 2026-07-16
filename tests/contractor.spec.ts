@@ -54,7 +54,21 @@ test.describe("Contractor Portal", () => {
     await expect(page).toHaveURL(/\/contractor\/dashboard/);
     await expect(page.locator("text=Demo mode")).toBeVisible();
     await expect(page.locator("text=Available Leads")).toBeVisible();
+    await expect(page.locator("[data-testid='lead-triage-controls']")).toBeVisible();
     await expect(page.locator("[data-testid='lead-fit-summary']").first()).toContainText("Why this fits");
     await expect(page.locator("[data-testid='lead-fit-summary']").first()).toContainText("Strong specialty match");
+  });
+
+  test("demo dashboard triage controls can filter available leads", async ({ page }) => {
+    await page.goto("/contractor/login");
+    await page.click("text=Explore Demo Account");
+    await expect(page).toHaveURL(/\/contractor\/dashboard/);
+
+    await page.selectOption("[data-testid='lead-service-select']", "stump");
+    await expect(page.locator("p.font-semibold", { hasText: "Stump Grinding" })).toBeVisible();
+    await expect(page.locator("text=Peachtree St NE")).toHaveCount(0);
+
+    await page.click("button:has-text('Unlocked')");
+    await expect(page.locator("text=No leads match those filters right now.")).toBeVisible();
   });
 });
