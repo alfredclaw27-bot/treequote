@@ -26,6 +26,9 @@
 .DS_Store
 *.pem
 
+# generated outreach lists (scraped contractor contacts — keep out of git)
+/contractor-lists
+
 # debug
 npm-debug.log*
 yarn-debug.log*

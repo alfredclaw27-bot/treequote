@@ -133,7 +133,7 @@ export async function sendLeadAlerts(lead: Lead): Promise<NotificationResult> {
 
     try {
       const { error } = await resend.emails.send({
-        from: `${siteConfig.brand.name} Alerts <${siteConfig.emailCopy.alertsFromEmail}>`,
+        from: `${siteConfig.brand.name} Alerts <${process.env.RESEND_FROM_EMAIL || siteConfig.emailCopy.alertsFromEmail}>`,
         to: contractor.email,
         subject: `${siteConfig.emailCopy.leadAlertSubjectPrefix}${cityLabel ? ` — ${cityLabel}` : ""} [${serviceLabel}]`,
         html: emailHtml,

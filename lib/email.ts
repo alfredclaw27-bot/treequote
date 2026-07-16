@@ -4,7 +4,12 @@ import { formatDetailsSummary, maskAddressToCity } from "@/lib/details";
 import type { Lead } from "@/types";
 
 function fromEmail() {
-  return `${siteConfig.emailCopy.fromName} <${siteConfig.emailCopy.fromEmail}>`;
+  // Once a domain is verified in Resend, set RESEND_FROM_EMAIL (e.g.
+  // "quotes@mtkinnovations.com") in the environment to send from it and reach
+  // any recipient. Until then this falls back to config's onboarding@resend.dev,
+  // which only delivers to the Resend account owner.
+  const address = process.env.RESEND_FROM_EMAIL || siteConfig.emailCopy.fromEmail;
+  return `${siteConfig.emailCopy.fromName} <${address}>`;
 }
 
 function getResend() {

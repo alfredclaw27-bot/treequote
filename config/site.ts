@@ -508,9 +508,11 @@ export const siteConfig: SiteConfig = {
 
   emailCopy: {
     fromName: "TreeQuote",
-    // Resend has no verified domain yet — onboarding@resend.dev is the only
-    // from-address it accepts. Swap these to @<your-domain> once a domain
-    // is verified at resend.com/domains.
+    // Default fallback until a domain is verified in Resend: onboarding@resend.dev
+    // is the only from-address it accepts, and it delivers ONLY to the Resend
+    // account owner. To go live, verify mtkinnovations.com at resend.com/domains,
+    // then set RESEND_FROM_EMAIL=quotes@mtkinnovations.com in the environment —
+    // lib/email.ts and lib/notifications.ts prefer that env var over these.
     fromEmail: "onboarding@resend.dev",
     alertsFromEmail: "onboarding@resend.dev",
     replyToEmail: "miketkapp@gmail.com",

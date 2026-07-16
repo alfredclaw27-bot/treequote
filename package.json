@@ -13,7 +13,8 @@
     "test:webkit": "playwright test --project=webkit",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --project=chromium --headed",
-    "playwright:install": "playwright install chromium webkit"
+    "playwright:install": "playwright install chromium webkit",
+    "find-contractors": "node scripts/find-contractors.mjs"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
