@@ -347,8 +347,10 @@ export const siteConfig: SiteConfig = {
     copyrightName: "TreeQuote",
     links: [
       { label: "Get a Quote", href: "/submit" },
+      { label: "For Contractors", href: "/contractors" },
       { label: "Contractor Login", href: "/contractor/login" },
-      { label: "Apply as a Contractor", href: "/contractor/apply" },
+      { label: "Terms", href: "/terms" },
+      { label: "Privacy", href: "/privacy" },
     ],
   },
 
