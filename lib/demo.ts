@@ -241,3 +241,42 @@ export function spendDemoCredit(): number {
   localStorage.setItem(DEMO_CREDITS_KEY, String(remaining));
   return remaining;
 }
+
+const DEMO_LEAD_EVENTS_KEY = `${appSlug}_demo_lead_events`;
+
+/**
+ * Demo-mode "Updates & comments" timeline (see tq_lead_events / lib/lead-events.ts).
+ * Comments and tracked edits are persisted the same way real-backend rows
+ * would look, keyed by `lead_id`, so the customer/contractor UI can render
+ * them identically regardless of backend.
+ */
+export function getDemoLeadEvents(leadId: string): Record<string, unknown>[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const all = JSON.parse(localStorage.getItem(DEMO_LEAD_EVENTS_KEY) ?? "[]") as Record<string, unknown>[];
+    return all.filter((e) => e.lead_id === leadId);
+  } catch {
+    return [];
+  }
+}
+
+export function saveDemoLeadEvent(event: Record<string, unknown>): void {
+  try {
+    const existing = JSON.parse(localStorage.getItem(DEMO_LEAD_EVENTS_KEY) ?? "[]");
+    localStorage.setItem(DEMO_LEAD_EVENTS_KEY, JSON.stringify([...existing, event]));
+  } catch {
+    // Never let a storage failure block the comment/edit flow.
+    console.warn("[demo] Unable to persist demo lead event to localStorage; continuing without it.");
+  }
+}
+
+/** Patches a stored demo lead in place (used by "Edit my request" — details/service_types only). */
+export function updateDemoLead(leadId: string, patch: Record<string, unknown>): void {
+  try {
+    const existing = getDemoLeads();
+    const updated = existing.map((l) => (l.id === leadId ? { ...l, ...patch } : l));
+    localStorage.setItem(DEMO_LEADS_KEY, JSON.stringify(updated));
+  } catch {
+    console.warn("[demo] Unable to update demo lead in localStorage; continuing without it.");
+  }
+}
