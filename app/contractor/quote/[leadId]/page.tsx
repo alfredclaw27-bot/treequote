@@ -8,12 +8,61 @@ import { QuoteForm } from "@/components/QuoteForm";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { ArrowLeft, MapPin, Clock, CreditCard, CheckCircle, Zap, Lock } from "lucide-react";
-import type { Lead } from "@/types";
+import { ArrowLeft, MapPin, Clock, CreditCard, CheckCircle, Zap, Lock, History } from "lucide-react";
+import type { Lead, LeadEvent } from "@/types";
 import { siteConfig, getLeadPriceCents } from "@/config/site";
 import { formatDetailsSummary, maskAddressToCity } from "@/lib/details";
+import { formatChangeLine } from "@/lib/lead-events";
 import { findMockLead } from "@/lib/mock-data";
-import { isDemoMode, isDemoLeadUnlocked, unlockDemoLead, getDemoCredits, spendDemoCredit, saveDemoQuote } from "@/lib/demo";
+import {
+  isDemoMode,
+  isDemoLeadUnlocked,
+  unlockDemoLead,
+  getDemoCredits,
+  spendDemoCredit,
+  saveDemoQuote,
+  getDemoLeadEvents,
+} from "@/lib/demo";
+
+/**
+ * Read-only "Updates & comments" timeline, shown to contractors both before
+ * and after unlocking a lead. Safe pre-unlock because customer edits are
+ * scoped to job details/service type only (never contact info or address —
+ * see app/customer/quotes/[leadId]/EditRequestForm.tsx), so nothing masked
+ * elsewhere on this page can leak through an event here.
+ */
+function EventTimeline({ events }: { events: LeadEvent[] }) {
+  if (events.length === 0) return null;
+  return (
+    <Card className="p-5 mb-6 dark:bg-gray-800 dark:border-gray-700">
+      <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+        <History size={16} className="text-gray-400" /> Updates &amp; comments
+      </h3>
+      <ul data-testid="event-timeline" className="space-y-3">
+        {events.map((event) => {
+          const when = new Date(event.created_at);
+          const timestamp = `${when.toLocaleDateString()} at ${when.toLocaleTimeString()}`;
+          return (
+            <li key={event.id} data-testid="event-item" className="border-l-2 border-primary/30 pl-3">
+              <p className="text-xs text-gray-400">{timestamp}</p>
+              {event.type === "comment" ? (
+                <p className="text-sm text-gray-700 dark:text-gray-200 mt-0.5">{event.body}</p>
+              ) : (
+                <ul className="mt-0.5 space-y-0.5">
+                  {(event.changes ?? []).map((change, i) => (
+                    <li key={`${change.field}-${i}`} className="text-sm text-gray-700 dark:text-gray-200">
+                      {formatChangeLine(change)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
 
 function QuotePageContent() {
   const params = useParams();
@@ -31,6 +80,7 @@ function QuotePageContent() {
   const [paymentError, setPaymentError] = useState("");
   const [hasAccess, setHasAccess] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(false);
+  const [events, setEvents] = useState<LeadEvent[]>([]);
 
   const successParam = searchParams.get("success");
   const sessionIdParam = searchParams.get("session_id");
@@ -45,9 +95,15 @@ function QuotePageContent() {
         setHasAccess(isDemoLeadUnlocked(leadId));
         setLeadCredits(getDemoCredits());
       }
+      setEvents(getDemoLeadEvents(leadId) as unknown as LeadEvent[]);
       setLoading(false);
       return;
     }
+
+    fetch(`/api/leads/${leadId}/events`)
+      .then((r) => (r.ok ? r.json() : { events: [] }))
+      .then((data) => setEvents((data.events ?? []) as LeadEvent[]))
+      .catch((e) => console.error("Failed to load lead events:", e));
 
     const res = await fetch(`/api/contractor/leads/${leadId}`);
     if (res.status === 401) {
@@ -296,6 +352,8 @@ function QuotePageContent() {
               </Card>
             )}
 
+            <EventTimeline events={events} />
+
             {siteConfig.features.aiAnalysis && lead.analysis_data && (
               <div className="mb-6">
                 <AnalysisDisplay data={lead.analysis_data} />
@@ -423,6 +481,8 @@ function QuotePageContent() {
                 </ul>
               </Card>
             )}
+
+            <EventTimeline events={events} />
 
             {siteConfig.features.aiAnalysis && lead.analysis_data && (
               <div className="mb-6">

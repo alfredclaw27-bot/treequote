@@ -7,12 +7,14 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { AnalysisDisplay } from "@/components/AnalysisDisplay";
-import type { Lead, Quote, Contractor } from "@/types";
-import { ArrowLeft, Calendar, MessageSquare, CheckCircle, Clock } from "lucide-react";
+import type { Lead, Quote, Contractor, LeadEvent, LeadDetails } from "@/types";
+import { ArrowLeft, Calendar, MessageSquare, CheckCircle, Clock, Pencil, History } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { formatDetailsSummary } from "@/lib/details";
+import { formatChangeLine, buildLeadEditChanges } from "@/lib/lead-events";
 import { findMockLead } from "@/lib/mock-data";
-import { findDemoLead, getDemoQuotes } from "@/lib/demo";
+import { findDemoLead, getDemoQuotes, getDemoLeadEvents, saveDemoLeadEvent, updateDemoLead } from "@/lib/demo";
+import { EditRequestForm } from "./EditRequestForm";
 
 export default function CustomerQuotesPage() {
   const params = useParams();
@@ -23,6 +25,29 @@ export default function CustomerQuotesPage() {
   const [quotes, setQuotes] = useState<(Quote & { contractor?: Contractor })[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
+
+  // Updates & comments timeline (tq_lead_events) — see lib/lead-events.ts
+  const [events, setEvents] = useState<LeadEvent[]>([]);
+  const [comment, setComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
+  const [commentError, setCommentError] = useState("");
+  const [editing, setEditing] = useState(false);
+
+  const loadEvents = async (currentLeadId: string, demo: boolean) => {
+    if (demo) {
+      const demoEvents = getDemoLeadEvents(currentLeadId) as unknown as LeadEvent[];
+      setEvents(demoEvents);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/leads/${currentLeadId}/events`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setEvents((data.events ?? []) as LeadEvent[]);
+    } catch (e) {
+      console.error("Failed to load lead events:", e);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -42,6 +67,7 @@ export default function CustomerQuotesPage() {
           .order("amount", { ascending: true });
 
         if (quotesData) setQuotes(quotesData as (Quote & { contractor?: Contractor })[]);
+        await loadEvents(leadId, false);
       } else {
         // Fall back to demo/mock lead so the confirmation link always works
         setIsDemo(true);
@@ -49,11 +75,85 @@ export default function CustomerQuotesPage() {
         if (mockLead) setLead(mockLead);
         const demoQuotes = getDemoQuotes().filter((q) => q.lead_id === leadId);
         if (demoQuotes.length > 0) setQuotes(demoQuotes as unknown as (Quote & { contractor?: Contractor })[]);
+        await loadEvents(leadId, true);
       }
       setLoading(false);
     };
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadId, supabase]);
+
+  const handlePostComment = async () => {
+    const body = comment.trim();
+    if (!body) return;
+    setCommentError("");
+    setPostingComment(true);
+    try {
+      if (isDemo) {
+        const event: LeadEvent = {
+          id: `demo-event-${Date.now().toString(36)}`,
+          lead_id: leadId,
+          actor: "customer",
+          type: "comment",
+          body,
+          created_at: new Date().toISOString(),
+        };
+        saveDemoLeadEvent(event as unknown as Record<string, unknown>);
+        setEvents((prev) => [...prev, event]);
+      } else {
+        const res = await fetch(`/api/leads/${leadId}/events`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to add comment");
+        setEvents((prev) => [...prev, data.event as LeadEvent]);
+      }
+      setComment("");
+    } catch (e) {
+      setCommentError(e instanceof Error ? e.message : "Failed to add comment. Please try again.");
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const handleSaveEdit = async (next: { details: LeadDetails; service_types: string[] }) => {
+    if (!lead) return;
+    if (isDemo) {
+      const changes = buildLeadEditChanges(
+        { details: lead.details ?? {}, service_types: lead.service_types ?? [] },
+        next
+      );
+      updateDemoLead(leadId, { details: next.details, service_types: next.service_types });
+      setLead((prev) => (prev ? { ...prev, details: next.details, service_types: next.service_types } : prev));
+      if (changes.length > 0) {
+        const event: LeadEvent = {
+          id: `demo-event-${Date.now().toString(36)}`,
+          lead_id: leadId,
+          actor: "customer",
+          type: "edit",
+          changes,
+          created_at: new Date().toISOString(),
+        };
+        saveDemoLeadEvent(event as unknown as Record<string, unknown>);
+        setEvents((prev) => [...prev, event]);
+      }
+      setEditing(false);
+      return;
+    }
+
+    const res = await fetch(`/api/leads/${leadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(next),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to save changes");
+    setLead(data.lead as Lead);
+    if (data.event) setEvents((prev) => [...prev, data.event as LeadEvent]);
+    setEditing(false);
+  };
 
   const handleAccept = async (quoteId: string) => {
     // Routed through an API route (rather than updating directly from the
@@ -67,6 +167,17 @@ export default function CustomerQuotesPage() {
     }
     setQuotes((qs) => qs.map((q) => (q.id === quoteId ? { ...q, status: "accepted" as const } : q)));
   };
+
+  const sortedQuotes = [...quotes].sort((a, b) => a.amount - b.amount);
+  const acceptedQuote = sortedQuotes.find((quote) => quote.status === "accepted");
+  const lowestQuote = sortedQuotes[0];
+  const highestQuote = sortedQuotes[sortedQuotes.length - 1];
+  const fastestQuote = sortedQuotes
+    .filter((quote) => quote.estimated_date)
+    .sort((a, b) => new Date(a.estimated_date ?? "").getTime() - new Date(b.estimated_date ?? "").getTime())[0];
+
+  const formatMoney = (amount: number) => `$${amount.toLocaleString()}`;
+  const formatDate = (value: string) => new Date(value).toLocaleDateString();
 
   if (loading) {
     return (
@@ -113,14 +224,100 @@ export default function CustomerQuotesPage() {
         </Card>
 
         {/* Job Details */}
-        {lead.details && formatDetailsSummary(lead.details).length > 0 && (
-          <Card className="p-5 dark:bg-gray-800 dark:border-gray-700">
-            <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Your Request Details</h2>
+        <Card className="p-5 dark:bg-gray-800 dark:border-gray-700">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <h2 className="font-semibold text-gray-900 dark:text-white">Your Request Details</h2>
+            {!editing && (
+              <button
+                type="button"
+                data-testid="edit-request"
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1 text-sm font-medium text-primary hover:underline flex-shrink-0"
+              >
+                <Pencil size={14} /> Edit my request
+              </button>
+            )}
+          </div>
+
+          {editing ? (
+            <div className="pt-2">
+              <p className="text-xs text-gray-400 mb-4">
+                You can update your service and job details below. Contact info and address can&apos;t be changed here —
+                email {siteConfig.brand.supportEmail} if those need to change. Every change is tracked with a date and time.
+              </p>
+              <EditRequestForm
+                details={lead.details ?? {}}
+                serviceTypes={lead.service_types ?? []}
+                onSave={handleSaveEdit}
+                onCancel={() => setEditing(false)}
+              />
+            </div>
+          ) : lead.details && formatDetailsSummary(lead.details).length > 0 ? (
             <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
               {formatDetailsSummary(lead.details).map((line) => <li key={line}>{line}</li>)}
             </ul>
-          </Card>
-        )}
+          ) : (
+            <p className="text-sm text-gray-400">No additional details provided.</p>
+          )}
+        </Card>
+
+        {/* Updates & comments timeline */}
+        <Card className="p-5 dark:bg-gray-800 dark:border-gray-700">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+            <History size={18} className="text-gray-400" /> Updates &amp; comments
+          </h2>
+
+          {events.length === 0 ? (
+            <p className="text-sm text-gray-400 mb-4">
+              No updates yet. Add a comment below, or edit your request above — changes show up here with the date and time.
+            </p>
+          ) : (
+            <ul data-testid="event-timeline" className="space-y-3 mb-4">
+              {events.map((event) => {
+                const when = new Date(event.created_at);
+                const timestamp = `${when.toLocaleDateString()} at ${when.toLocaleTimeString()}`;
+                return (
+                  <li key={event.id} data-testid="event-item" className="border-l-2 border-primary/30 pl-3">
+                    <p className="text-xs text-gray-400">{timestamp}</p>
+                    {event.type === "comment" ? (
+                      <p className="text-sm text-gray-700 dark:text-gray-200 mt-0.5">{event.body}</p>
+                    ) : (
+                      <ul className="mt-0.5 space-y-0.5">
+                        {(event.changes ?? []).map((change, i) => (
+                          <li key={`${change.field}-${i}`} className="text-sm text-gray-700 dark:text-gray-200">
+                            {formatChangeLine(change)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div className="space-y-2">
+            <textarea
+              data-testid="comment-input"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Add a comment for the contractors reviewing your request..."
+              rows={2}
+              className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+            {commentError && <p className="text-sm text-red-600">{commentError}</p>}
+            <div className="flex justify-end">
+              <Button
+                data-testid="post-comment"
+                size="sm"
+                onClick={handlePostComment}
+                disabled={postingComment || !comment.trim()}
+              >
+                {postingComment ? "Posting..." : "Post comment"}
+              </Button>
+            </div>
+          </div>
+        </Card>
 
         {siteConfig.features.aiAnalysis && lead.analysis_data && (
           <AnalysisDisplay data={lead.analysis_data} />
@@ -140,11 +337,67 @@ export default function CustomerQuotesPage() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {quotes.map((quote) => (
+              <Card className="p-5 dark:bg-gray-800 dark:border-gray-700">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Compare at a glance</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Quotes are sorted by price so you can spot the best fit faster.
+                    </p>
+                  </div>
+                  {acceptedQuote ? <Badge variant="green">Accepted</Badge> : <Badge variant="blue">Ready to compare</Badge>}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-900/60 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Lowest quote</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">{lowestQuote ? formatMoney(lowestQuote.amount) : "—"}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{lowestQuote?.contractor?.business_name ?? "First quote in the list"}</p>
+                  </div>
+
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-900/60 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Price range</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {lowestQuote && highestQuote ? `${formatMoney(lowestQuote.amount)} - ${formatMoney(highestQuote.amount)}` : "—"}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {lowestQuote && highestQuote && lowestQuote.id !== highestQuote.id
+                        ? `${formatMoney(highestQuote.amount - lowestQuote.amount)} spread between quotes`
+                        : "Only one quote so far"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-900/60 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Fastest availability</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {fastestQuote?.estimated_date ? formatDate(fastestQuote.estimated_date) : "No date yet"}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {fastestQuote?.contractor?.business_name ?? "Contractors can add timing with their quote"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-900/60 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {acceptedQuote ? "Accepted quote" : "Status"}
+                    </p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {acceptedQuote ? formatMoney(acceptedQuote.amount) : `${sortedQuotes.length} quote${sortedQuotes.length === 1 ? "" : "s"}`}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {acceptedQuote
+                        ? `You chose ${acceptedQuote.contractor?.business_name ?? "this contractor"}`
+                        : "Review notes, timing, and pricing below"}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {sortedQuotes.map((quote) => (
                 <Card key={quote.id} className="p-5 dark:bg-gray-800 dark:border-gray-700">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <p className="font-bold text-2xl text-gray-900 dark:text-white">${quote.amount.toLocaleString()}</p>
+                      <p className="font-bold text-2xl text-gray-900 dark:text-white">{formatMoney(quote.amount)}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">{quote.contractor?.business_name ?? "Contractor"}</p>
                     </div>
                     <Badge variant={quote.status === "accepted" ? "green" : quote.status === "rejected" ? "red" : "amber"}>
@@ -163,7 +416,7 @@ export default function CustomerQuotesPage() {
                     <div className="flex gap-2 mb-4">
                       <Calendar size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
                       <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Available: {new Date(quote.estimated_date).toLocaleDateString()}
+                        Available: {formatDate(quote.estimated_date)}
                       </p>
                     </div>
                   )}
