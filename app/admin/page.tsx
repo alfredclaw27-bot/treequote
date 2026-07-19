@@ -7,9 +7,15 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { Lead, Contractor, Quote } from "@/types";
 import Link from "next/link";
-import { CheckCircle, XCircle, Star, Plus, ChevronDown, ChevronUp, Mail, Phone, MessageCircle, Users } from "lucide-react";
+import { CheckCircle, XCircle, Star, Plus, ChevronDown, ChevronUp, Mail, Phone, MessageCircle, Users, Search, Globe, MapPin } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { formatDetailsSummary } from "@/lib/details";
+import {
+  OUTREACH_STATUSES,
+  OUTREACH_STATUS_LABELS,
+  type OutreachContractor,
+  type OutreachStatus,
+} from "@/lib/outreach";
 
 interface LeadNotification {
   id: string;
@@ -37,6 +43,18 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
 
+  // Outreach (supply-side CRM). tq_outreach_contractors has no public RLS
+  // policy — admin-only data — so it's read/written through the
+  // /api/admin/outreach/** routes (service-role, cookie-gated) rather than
+  // the browser Supabase client used for the tables above.
+  const [outreach, setOutreach] = useState<OutreachContractor[]>([]);
+  const [outreachLoading, setOutreachLoading] = useState(true);
+  const [outreachError, setOutreachError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [findingForLeadId, setFindingForLeadId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+
   useEffect(() => {
     const load = async () => {
       const [leadsRes, contractorsRes, quotesRes, notificationsRes] = await Promise.all([
@@ -54,6 +72,113 @@ export default function AdminPage() {
     };
     load();
   }, [supabase]);
+
+  useEffect(() => {
+    const loadOutreach = async () => {
+      try {
+        const res = await fetch("/api/admin/outreach");
+        if (!res.ok) {
+          setOutreach([]);
+          return;
+        }
+        const data = await res.json();
+        setOutreach(Array.isArray(data) ? data : []);
+      } catch {
+        // No backend configured (demo mode) or a network hiccup — render
+        // the section's empty state rather than crashing the page.
+        setOutreach([]);
+      } finally {
+        setOutreachLoading(false);
+      }
+    };
+    loadOutreach();
+  }, []);
+
+  const runOutreachFind = async (query: string, leadId?: string) => {
+    setOutreachError(null);
+    try {
+      const res = await fetch("/api/admin/outreach/find", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, leadId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setOutreachError(data.error || "Search failed");
+        return;
+      }
+      const rows: OutreachContractor[] = data.rows ?? [];
+      setOutreach((prev) => {
+        const byId = new Map(prev.map((r) => [r.id, r] as const));
+        for (const row of rows) byId.set(row.id, row);
+        return Array.from(byId.values()).sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      });
+      if (rows.length === 0) {
+        setOutreachError(`No results for "${query}"`);
+      }
+    } catch {
+      setOutreachError("Network error — search failed");
+    }
+  };
+
+  const handleStandaloneSearch = async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    await runOutreachFind(q);
+    setSearching(false);
+  };
+
+  const handleFindForLead = async (lead: Lead) => {
+    setFindingForLeadId(lead.id);
+    await runOutreachFind(`tree service near ${lead.address}`, lead.id);
+    setFindingForLeadId(null);
+  };
+
+  const updateOutreachStatus = async (id: string, status: OutreachStatus) => {
+    setOutreach((rows) => rows.map((r) => (r.id === id ? { ...r, status } : r)));
+    const res = await fetch(`/api/admin/outreach/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setOutreach((rows) => rows.map((r) => (r.id === id ? updated : r)));
+    }
+  };
+
+  const saveOutreachNotes = async (id: string) => {
+    const notes = notesDraft[id];
+    if (notes === undefined) return;
+    const res = await fetch(`/api/admin/outreach/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setOutreach((rows) => rows.map((r) => (r.id === id ? updated : r)));
+    }
+  };
+
+  const outreachCounts = {
+    found: outreach.filter((r) => r.status === "found").length,
+    contacted: outreach.filter((r) => r.status === "contacted").length,
+    responded: outreach.filter((r) => r.status === "responded").length,
+    joined: outreach.filter((r) => r.status === "joined").length,
+  };
+
+  const OUTREACH_STATUS_BADGE: Record<OutreachStatus, "green" | "amber" | "red" | "gray" | "blue"> = {
+    found: "gray",
+    contacted: "amber",
+    no_answer: "red",
+    responded: "blue",
+    joined: "green",
+    declined: "red",
+  };
 
   const toggleContractorApproval = async (id: string, approved: boolean) => {
     await supabase.from("tq_contractors").update({ approved }).eq("id", id);
@@ -143,6 +268,15 @@ export default function AdminPage() {
                           🔄 Resend Alerts
                         </button>
                         <button
+                          onClick={() => handleFindForLead(lead)}
+                          disabled={findingForLeadId === lead.id}
+                          className="px-3 py-1.5 text-sm bg-primary/10 hover:bg-primary/20 text-primary rounded-lg border border-primary/20 transition-colors disabled:opacity-50"
+                          title="Search Google Places for tree services near this lead's address"
+                          data-testid="find-contractors-for-lead"
+                        >
+                          {findingForLeadId === lead.id ? "Searching…" : "🔎 Find contractors"}
+                        </button>
+                        <button
                           onClick={() => setExpandedLeadId(isExpanded ? null : lead.id)}
                           className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300"
                           title="View full details"
@@ -216,6 +350,52 @@ export default function AdminPage() {
                                           <MessageCircle size={14} />
                                         </a>
                                       </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Outreach: nearby contractors found for this lead */}
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                            Contractors Found Nearby ({outreach.filter((r) => r.lead_id === lead.id).length})
+                          </p>
+                          {outreachError && isExpanded && (
+                            <p className="text-sm text-red-500 mb-2" data-testid="outreach-lead-error">{outreachError}</p>
+                          )}
+                          {outreach.filter((r) => r.lead_id === lead.id).length === 0 ? (
+                            <p className="text-sm text-gray-400">
+                              No contractors found nearby yet — use &quot;Find contractors&quot; above to search Google Places.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {outreach.filter((r) => r.lead_id === lead.id).map((c) => (
+                                <div key={c.id} className="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 border border-gray-100 dark:border-gray-700 text-sm">
+                                  <span className="font-medium text-gray-900 dark:text-white">{c.name}</span>
+                                  {c.rating != null && (
+                                    <span className="text-xs text-gray-400 flex items-center gap-0.5">
+                                      <Star size={12} className="fill-accent text-accent" /> {c.rating} ({c.review_count ?? 0})
+                                    </span>
+                                  )}
+                                  <Badge variant={OUTREACH_STATUS_BADGE[c.status]}>{OUTREACH_STATUS_LABELS[c.status]}</Badge>
+                                  <div className="flex items-center gap-2 ml-auto">
+                                    {c.phone && (
+                                      <a href={`tel:${c.phone}`} className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20" title={`Call ${c.phone}`}>
+                                        <Phone size={14} />
+                                      </a>
+                                    )}
+                                    {c.email && (
+                                      <a href={`mailto:${c.email}`} className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20" title={`Email ${c.email}`}>
+                                        <Mail size={14} />
+                                      </a>
+                                    )}
+                                    {c.website && (
+                                      <a href={c.website} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20" title="Visit website">
+                                        <Globe size={14} />
+                                      </a>
                                     )}
                                   </div>
                                 </div>
@@ -317,6 +497,132 @@ export default function AdminPage() {
                     {q.notes && <p className="text-xs text-gray-400 truncate mt-1">{q.notes}</p>}
                   </div>
                   <Badge variant={q.status === "pending" ? "amber" : q.status === "accepted" ? "green" : "gray"}>{q.status}</Badge>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Outreach — supply-side contractor CRM (GTM Phase 1) */}
+        <section data-testid="outreach-section">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Outreach</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Find local tree service companies near incoming customer requests (or search any area) and track calling/emailing them until they join.
+          </p>
+
+          {/* Summary counts */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+            {([
+              ["Found", outreachCounts.found, "gray"],
+              ["Contacted", outreachCounts.contacted, "amber"],
+              ["Responded", outreachCounts.responded, "blue"],
+              ["Joined", outreachCounts.joined, "green"],
+            ] as const).map(([label, count]) => (
+              <Card key={label} className="p-4 text-center dark:bg-gray-800 dark:border-gray-700">
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{count}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</p>
+              </Card>
+            ))}
+          </div>
+
+          {/* Standalone prospecting search */}
+          <Card className="p-4 mb-5 dark:bg-gray-800 dark:border-gray-700">
+            <label htmlFor="outreach-search" className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2 block">
+              Search any area
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <input
+                id="outreach-search"
+                data-testid="outreach-search-input"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleStandaloneSearch();
+                }}
+                placeholder='e.g. "tree service in Turnersville, NJ"'
+                className="flex-1 min-w-[220px] px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm"
+              />
+              <Button size="sm" onClick={handleStandaloneSearch} disabled={searching || !searchQuery.trim()} data-testid="outreach-search-button">
+                <Search size={14} />
+                {searching ? "Searching…" : "Search"}
+              </Button>
+            </div>
+            {outreachError && <p className="text-sm text-red-500 mt-2" data-testid="outreach-error">{outreachError}</p>}
+          </Card>
+
+          {/* Full outreach table */}
+          {outreachLoading ? (
+            <div className="space-y-3">{[1, 2].map((i) => <Skeleton key={i} className="h-16" />)}</div>
+          ) : outreach.length === 0 ? (
+            <Card className="p-8 text-center text-gray-400 dark:bg-gray-800 dark:border-gray-700" data-testid="outreach-empty">
+              Nothing found yet — use the search above, or search from a lead&apos;s details below.
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {outreach.map((c) => (
+                <Card key={c.id} className="p-4 dark:bg-gray-800 dark:border-gray-700">
+                  <div className="flex flex-wrap items-start gap-4">
+                    <div className="flex-1 min-w-[200px]">
+                      <p className="font-medium text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
+                        {c.name}
+                        {c.rating != null && (
+                          <span className="text-xs text-gray-400 flex items-center gap-0.5 font-normal">
+                            <Star size={12} className="fill-accent text-accent" /> {c.rating} ({c.review_count ?? 0})
+                          </span>
+                        )}
+                      </p>
+                      {c.address && (
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <MapPin size={11} /> {c.address}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-3 mt-1.5 text-sm">
+                        {c.phone && (
+                          <a href={`tel:${c.phone}`} className="text-primary hover:underline flex items-center gap-1">
+                            <Phone size={13} /> {c.phone}
+                          </a>
+                        )}
+                        {c.email && (
+                          <a href={`mailto:${c.email}`} className="text-primary hover:underline flex items-center gap-1">
+                            <Mail size={13} /> {c.email}
+                          </a>
+                        )}
+                        {c.website && (
+                          <a href={c.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                            <Globe size={13} /> Website
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1.5">
+                      <select
+                        value={c.status}
+                        onChange={(e) => updateOutreachStatus(c.id, e.target.value as OutreachStatus)}
+                        className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm"
+                        data-testid="outreach-status-select"
+                      >
+                        {OUTREACH_STATUSES.map((s) => (
+                          <option key={s} value={s}>{OUTREACH_STATUS_LABELS[s]}</option>
+                        ))}
+                      </select>
+                      <div className="text-xs text-gray-400 text-right">
+                        {c.contacted_at && <p>Contacted {new Date(c.contacted_at).toLocaleDateString()}</p>}
+                        <p>Found {new Date(c.created_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <textarea
+                    value={notesDraft[c.id] ?? c.notes ?? ""}
+                    onChange={(e) => setNotesDraft((d) => ({ ...d, [c.id]: e.target.value }))}
+                    onBlur={() => saveOutreachNotes(c.id)}
+                    placeholder="Notes (call outcome, next steps...)"
+                    rows={1}
+                    className="mt-3 w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm resize-y"
+                    data-testid="outreach-notes-input"
+                  />
                 </Card>
               ))}
             </div>
