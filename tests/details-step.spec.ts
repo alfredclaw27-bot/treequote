@@ -27,19 +27,18 @@ test.describe("Details step — one question per page", () => {
 
     await page.click("button:has-text('Under 20 ft')");
     // Immediately after the click we should still be on the same question
-    // (auto-advance hasn't fired yet) — then it should move on shortly after.
-    await expect(page.locator("[data-testid='detail-question-label']")).toHaveText("Tree type", { timeout: 2000 });
+    // (auto-advance hasn't fired yet) — then it should move on shortly after,
+    // landing on the (optional) trunk thickness question next.
+    await expect(page.locator("[data-testid='detail-question-label']")).toContainText("Trunk thickness", { timeout: 2000 });
   });
 
   test("optional select shows a Next button to skip", async ({ page }) => {
     await goToDetailsStep(page, path.join(__dirname, "fixtures", "test-photo.png"));
 
     await page.click("button:has-text('Under 20 ft')");
-    await expect(page.locator("[data-testid='detail-question-label']")).toHaveText("Tree type");
-    await page.click("button:has-text('Oak')");
 
-    // Next optional question: "Stump situation" — has a Next button since it's not required.
-    await expect(page.locator("[data-testid='detail-question-label']")).toContainText("Stump situation");
+    // Trunk thickness is optional — has a Next button since it's not required.
+    await expect(page.locator("[data-testid='detail-question-label']")).toContainText("Trunk thickness");
     await expect(page.locator("button:has-text('Next')")).toBeEnabled();
   });
 
@@ -47,7 +46,7 @@ test.describe("Details step — one question per page", () => {
     await goToDetailsStep(page, path.join(__dirname, "fixtures", "test-photo.png"));
 
     await page.click("button:has-text('Under 20 ft')");
-    await expect(page.locator("[data-testid='detail-question-label']")).toHaveText("Tree type");
+    await expect(page.locator("[data-testid='detail-question-label']")).toContainText("Trunk thickness");
 
     // Back should return to the first question, not leave the Details step.
     await page.click("button:has-text('Back')");
@@ -63,6 +62,8 @@ test.describe("Details step — one question per page", () => {
     await goToDetailsStep(page, path.join(__dirname, "fixtures", "test-photo.png"));
 
     await page.click("button:has-text('Under 20 ft')");
+    await expect(page.locator("[data-testid='detail-question-label']")).toContainText("Trunk thickness");
+    await page.click("button:has-text('Next')");
     await expect(page.locator("[data-testid='detail-question-label']")).toHaveText("Tree type");
     await page.click("button:has-text('Oak')");
     await expect(page.locator("[data-testid='detail-question-label']")).toContainText("Stump situation");
@@ -77,6 +78,8 @@ test.describe("Details step — one question per page", () => {
     await goToDetailsStep(page, path.join(__dirname, "fixtures", "test-photo.png"));
 
     await page.click("button:has-text('Under 20 ft')");
+    await expect(page.locator("[data-testid='detail-question-label']")).toContainText("Trunk thickness");
+    await page.click("button:has-text('Next')");
     await expect(page.locator("[data-testid='detail-question-label']")).toHaveText("Tree type");
     await page.click("button:has-text('Oak')");
     await expect(page.locator("[data-testid='detail-question-label']")).toContainText("Stump situation");

@@ -16,20 +16,20 @@ test.describe("Address masking pre/post unlock", () => {
 
   test("dashboard lead list shows city-level location only for locked leads", async ({ page }) => {
     // mock-005 starts locked in a fresh demo session.
-    const card = page.locator("text=88 Dogwood Ln").first();
+    const card = page.locator("text=88 Stagecoach Rd").first();
     await expect(card).toHaveCount(0);
-    await expect(page.locator("text=Alpharetta, GA 30009").first()).toBeVisible();
+    await expect(page.locator("text=Marlton, NJ 08053").first()).toBeVisible();
   });
 
   test("quote page hides the street address until unlocked, then reveals it", async ({ page }) => {
     await page.goto("/contractor/quote/mock-001");
 
-    await expect(page.locator("text=142 Peachtree St NE")).toHaveCount(0);
-    await expect(page.locator("text=Atlanta, GA 30303").first()).toBeVisible();
+    await expect(page.locator("text=142 Church Rd")).toHaveCount(0);
+    await expect(page.locator("text=Turnersville, NJ 08012").first()).toBeVisible();
 
     await page.click("[data-testid='unlock-with-credit']");
     await expect(page.locator("[data-testid='contact-unlocked']")).toBeVisible();
 
-    await expect(page.locator("text=142 Peachtree St NE, Atlanta, GA 30303")).toBeVisible();
+    await expect(page.locator("text=142 Church Rd, Turnersville, NJ 08012")).toBeVisible();
   });
 });

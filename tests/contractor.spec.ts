@@ -66,7 +66,7 @@ test.describe("Contractor Portal", () => {
 
     await page.selectOption("[data-testid='lead-service-select']", "stump");
     await expect(page.locator("p.font-semibold", { hasText: "Stump Grinding" })).toBeVisible();
-    await expect(page.locator("text=Peachtree St NE")).toHaveCount(0);
+    await expect(page.locator("text=Church Rd")).toHaveCount(0);
 
     await page.click("button:has-text('Unlocked')");
     await expect(page.locator("text=No leads match those filters right now.")).toBeVisible();

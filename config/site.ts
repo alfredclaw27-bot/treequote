@@ -242,7 +242,7 @@ export const siteConfig: SiteConfig = {
     tagline: "Get quotes from local tree pros in minutes.",
     domain: "treequote.app",
     supportEmail: "mike@mtkinnovations.com",
-    region: "Georgia",
+    region: "South Jersey",
   },
 
   theme: {
@@ -257,9 +257,9 @@ export const siteConfig: SiteConfig = {
   hero: {
     badgeText: "trees serviced — Quotes in 24h or less",
     titleLines: ["Trees need work?"],
-    highlightLine: "Get quotes from local pros",
+    highlightLine: "Let them compete for you",
     subtitle:
-      "Tell us about your tree project and a few photos. Local contractors compete for your job. No obligation. No cost to you.",
+      "Why waste your time chasing quotes and sitting around in 4-hour arrival windows for contractors who might not even show? Tell us about your job and local pros compete for it — so you don't overpay. No obligation. No cost to you.",
     ctaLabel: "Get My Free Quote",
     secondaryCtaLabel: "See How It Works",
     heroImageUrl: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=1200&q=80",
@@ -267,7 +267,7 @@ export const siteConfig: SiteConfig = {
   },
 
   howItWorksCustomer: [
-    { icon: "📸", title: "Tell Us About Your Tree", desc: "Snap a photo and answer a few quick questions about the job." },
+    { icon: "📸", title: "Tell Us About Your Tree", desc: "Add a few photos and rough measurements, then answer a few quick questions about the job." },
     { icon: "📬", title: "We Notify Local Pros", desc: "Contractors in your area who match your job get notified instantly." },
     { icon: "💰", title: "Get Quotes", desc: "Local contractors review your request and submit competitive quotes. You pick the best." },
   ],
@@ -275,7 +275,7 @@ export const siteConfig: SiteConfig = {
   trustSignals: [
     { label: "No Obligation", desc: "You're never locked in" },
     { label: "Quotes in 24h", desc: "Fast contractor response" },
-    { label: "Local Pros", desc: "Contractors in your area" },
+    { label: "Pros Compete for You", desc: "Multiple quotes, so you don't overpay" },
   ],
 
   customerBanner: {
@@ -304,7 +304,8 @@ export const siteConfig: SiteConfig = {
 
   wizardMicrocopy: {
     reviewReassurance: "You're one click from real quotes — local pros usually respond the same day.",
-    momentumLine: "Takes about 2 minutes. Most of it's multiple choice.",
+    momentumLine:
+      "Takes about 2 minutes — most of it's multiple choice. Add a couple photos and rough measurements; if you can, stand a trash can or ladder next to the tree so pros can judge scale.",
     contactTrustLine: "Your info only goes to pros you choose to hear from — never sold, never spammed.",
   },
 
@@ -339,7 +340,9 @@ export const siteConfig: SiteConfig = {
   },
 
   socialProof: {
-    headline: "Trusted by homeowners across Georgia",
+    headline: "Trusted by homeowners across South Jersey",
+    // TODO(Mike): these are fabricated placeholder numbers carried over from
+    // the original build — replace with real stats before launch.
     statLine: "847 jobs serviced · 4.9/5 average rating",
   },
 
@@ -377,6 +380,20 @@ export const siteConfig: SiteConfig = {
         { value: "20_40", label: "20–40 ft" },
         { value: "40_60", label: "40–60 ft" },
         { value: "over_60", label: "Over 60 ft" },
+        { value: "not_sure", label: "Not sure" },
+      ],
+    },
+    {
+      key: "trunkThickness",
+      label: "Trunk thickness (around chest height)",
+      helpText: "Optional — a rough sense of the trunk diameter helps contractors quote tighter.",
+      kind: "select",
+      columns: 3,
+      options: [
+        { value: "under_1ft", label: "Under 1 ft across" },
+        { value: "1_2ft", label: "1–2 ft" },
+        { value: "2_3ft", label: "2–3 ft" },
+        { value: "over_3ft", label: "Over 3 ft" },
         { value: "not_sure", label: "Not sure" },
       ],
     },
