@@ -117,6 +117,9 @@ export default function AdminPage() {
       });
       if (rows.length === 0) {
         setOutreachError(`No results for "${query}"`);
+      } else if (data.notice) {
+        // e.g. demo mode: results shown but not persisted
+        setOutreachError(data.notice);
       }
     } catch {
       setOutreachError("Network error — search failed");

@@ -16,6 +16,11 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const leadId = searchParams.get("leadId");
 
+  // Demo mode (no Supabase): clean empty list, not a supabase-js network error.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return NextResponse.json([]);
+  }
+
   try {
     const supabase = await createServiceClient();
     let query = supabase

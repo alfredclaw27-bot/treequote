@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// @ts-nocheck
 /**
  * find-contractors — supply-side discovery for manual outreach.
  *

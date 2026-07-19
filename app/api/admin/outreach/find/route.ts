@@ -58,6 +58,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ rows: [], found: 0 });
   }
 
+  // No Supabase locally (demo mode): still return what Places found so the
+  // admin can see/call the companies — just unsaved. Statuses/notes need a
+  // real backend. (Without this, supabase-js's own network failure surfaces
+  // as a misleading "TypeError: fetch failed" 500.)
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    const rows = results.map((r, i) => ({
+      id: `unsaved-${i}`,
+      lead_id: leadId,
+      source: "places",
+      status: "found",
+      notes: null,
+      contacted_at: null,
+      created_at: new Date().toISOString(),
+      name: r.name,
+      phone: r.phone,
+      email: null,
+      website: r.website,
+      rating: r.rating,
+      review_count: r.review_count,
+      address: r.address,
+      maps_url: r.maps_url,
+    }));
+    return NextResponse.json({
+      rows,
+      found: results.length,
+      unsaved: true,
+      notice: "Results not saved — Supabase isn't configured in this environment.",
+    });
+  }
+
   // Everything past this point talks to Supabase. Without
   // NEXT_PUBLIC_SUPABASE_URL configured, createServiceClient() falls back to
   // a placeholder host and every call below throws — caught here so the
