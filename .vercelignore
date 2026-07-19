@@ -1,0 +1,10 @@
+# Keep the deploy upload lean — Vercel builds from source in the cloud.
+.next
+node_modules
+.git
+playwright-report
+test-results
+tests
+contractor-lists
+.agents
+*.tsbuildinfo
