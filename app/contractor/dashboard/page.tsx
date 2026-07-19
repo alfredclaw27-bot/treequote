@@ -25,8 +25,8 @@ const DEMO_CONTRACTOR_PROFILE: ContractorMatchProfile = {
 };
 
 const DEMO_CONTRACTOR_LOCATION = {
-  lat: 33.749,
-  lng: -84.388,
+  lat: 39.643,
+  lng: -75.052,
 };
 
 function calcDistanceMiles(origin: { lat: number; lng: number } | undefined, lead: Lead): number | null {

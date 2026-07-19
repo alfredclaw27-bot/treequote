@@ -183,7 +183,7 @@ export function LocationInput({ value, onChange }: LocationInputProps) {
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => suggestions.length > 0 && setOpen(true)}
-          placeholder="123 Main St, Atlanta, GA"
+          placeholder="123 Main St, Turnersville, NJ"
           className="pl-12 pr-10"
           autoComplete="off"
           data-testid="location-input"

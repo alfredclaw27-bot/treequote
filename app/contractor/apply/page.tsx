@@ -156,7 +156,7 @@ export default function ContractorApplyPage() {
                 id="serviceArea"
                 value={form.serviceArea}
                 onChange={(e) => setForm({ ...form, serviceArea: e.target.value })}
-                placeholder="Atlanta, GA · Marietta, GA · Roswell, GA"
+                placeholder="Turnersville, NJ · Sewell, NJ · Cherry Hill, NJ"
               />
               <p className="text-xs text-gray-400 mt-1.5">Comma-separated list of cities or zip codes you serve</p>
             </div>

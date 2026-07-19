@@ -148,7 +148,7 @@ export default function ContractorProfilePage() {
             label="Service Area (zip codes or cities)"
             value={serviceArea}
             onChange={(e) => setServiceArea(e.target.value)}
-            placeholder="Atlanta, GA · Marietta, GA · Roswell, GA"
+            placeholder="Turnersville, NJ · Sewell, NJ · Cherry Hill, NJ"
           />
         </Card>
 
