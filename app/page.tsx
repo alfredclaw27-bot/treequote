@@ -1,15 +1,13 @@
 "use client";
-import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ArrowRight, ShieldCheck, Star, Users, DollarSign, CheckCircle2, Sun, Moon } from "lucide-react";
+import { ArrowRight, ShieldCheck, Users, DollarSign, CheckCircle2, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { siteConfig } from "@/config/site";
 
 export default function LandingPage() {
   const { resolvedTheme, setTheme } = useTheme();
-  const [customerCount] = useState(847);
   const { brand, hero, howItWorksCustomer, trustSignals, customerBanner, contractorPitch, socialProof, footer, emotionalBenefits } = siteConfig;
 
   return (
@@ -37,7 +35,7 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="px-6 pt-12 pb-10 max-w-4xl mx-auto text-center">
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary-dark dark:text-primary rounded-full text-sm font-medium mb-6">
-          <ArrowRight size={14} /> {customerCount} {hero.badgeText}
+          <ArrowRight size={14} /> {hero.badgeText}
         </div>
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 dark:text-white leading-tight mb-6">
           {hero.titleLines.map((line, i) => (
@@ -230,9 +228,6 @@ export default function LandingPage() {
       {/* Social proof */}
       <section className="px-6 py-12 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="flex items-center justify-center gap-1 mb-4">
-            {[1, 2, 3, 4, 5].map((i) => <Star key={i} size={20} className="text-accent fill-accent" />)}
-          </div>
           <p className="text-gray-900 dark:text-white font-medium mb-1">{socialProof.headline}</p>
           <p className="text-gray-500 dark:text-gray-400 text-sm">{socialProof.statLine}</p>
         </div>

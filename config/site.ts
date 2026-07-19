@@ -255,7 +255,7 @@ export const siteConfig: SiteConfig = {
   },
 
   hero: {
-    badgeText: "trees serviced — Quotes in 24h or less",
+    badgeText: "Free quotes from local pros — usually within 24h",
     titleLines: ["Trees need work?"],
     highlightLine: "Let them compete for you",
     subtitle:
@@ -340,10 +340,10 @@ export const siteConfig: SiteConfig = {
   },
 
   socialProof: {
-    headline: "Trusted by homeowners across South Jersey",
-    // TODO(Mike): these are fabricated placeholder numbers carried over from
-    // the original build — replace with real stats before launch.
-    statLine: "847 jobs serviced · 4.9/5 average rating",
+    // Honest launch copy — no fabricated stats. Swap in real numbers
+    // (jobs serviced, avg rating) once there are real ones to show.
+    headline: "Now serving South Jersey",
+    statLine: "Founding launch — local pros compete for every job, free for homeowners",
   },
 
   footer: {
