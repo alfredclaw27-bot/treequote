@@ -92,6 +92,45 @@ CREATE TABLE IF NOT EXISTS tq_lead_notifications (
   sent_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Outreach Contractors (admin supply-side CRM — see migrations/2026-07-16-outreach.sql
+-- for full context. GTM Phase 1: Google Places results found per-lead or via
+-- freeform search, manually called/emailed by the site owner from /admin.)
+CREATE TABLE IF NOT EXISTS tq_outreach_contractors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lead_id UUID REFERENCES tq_leads(id) ON DELETE SET NULL,
+  source TEXT DEFAULT 'places',
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  website TEXT,
+  rating NUMERIC,
+  review_count INT,
+  address TEXT,
+  maps_url TEXT,
+  status TEXT NOT NULL DEFAULT 'found' CHECK (status IN ('found', 'contacted', 'no_answer', 'responded', 'joined', 'declined')),
+  notes TEXT,
+  contacted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS tq_outreach_contractors_dedupe_idx
+  ON tq_outreach_contractors (COALESCE(phone, ''), lower(name));
+
+-- Lead Events (customer comments + tracked edits on a lead — see
+-- lib/lead-events.ts and migrations/2026-07-16-lead-events.sql)
+CREATE TABLE IF NOT EXISTS tq_lead_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lead_id UUID REFERENCES tq_leads(id) ON DELETE CASCADE,
+  actor TEXT NOT NULL CHECK (actor IN ('customer', 'contractor', 'admin')),
+  type TEXT NOT NULL CHECK (type IN ('comment', 'edit')),
+  body TEXT,
+  changes JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tq_lead_events_lead_id ON tq_lead_events(lead_id);
+
 -- RLS
 ALTER TABLE tq_customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tq_leads ENABLE ROW LEVEL SECURITY;
@@ -99,6 +138,8 @@ ALTER TABLE tq_contractors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tq_quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tq_lead_access ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tq_lead_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tq_outreach_contractors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tq_lead_events ENABLE ROW LEVEL SECURITY;
 
 -- Relax RLS for MVP (full public access)
 CREATE POLICY "public_read_write" ON tq_customers FOR ALL USING (true) WITH CHECK (true);
@@ -107,6 +148,9 @@ CREATE POLICY "public_read_write" ON tq_contractors FOR ALL USING (true) WITH CH
 CREATE POLICY "public_read_write" ON tq_quotes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "public_read_write" ON tq_lead_access FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "public_read_write" ON tq_lead_notifications FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "public_read_write" ON tq_lead_events FOR ALL USING (true) WITH CHECK (true);
+-- tq_outreach_contractors intentionally has NO public policy — admin-only
+-- data, reachable only via the service-role key (app/api/admin/outreach/**).
 
 -- =============================================
 -- Storage Bucket

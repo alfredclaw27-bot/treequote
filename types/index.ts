@@ -97,3 +97,32 @@ export interface LeadAccess {
   stripe_payment_id?: string;
   created_at: string;
 }
+
+/** A single field-level change captured on a lead 'edit' event. */
+export interface LeadEventChange {
+  /** Key the change applies to — a detailFields[].key, or "service_types" */
+  field: string;
+  /** Human-readable label for the field, e.g. "Tree height" */
+  label: string;
+  /** Human-readable previous value, e.g. "20–40 ft" ("—" when empty) */
+  old: string;
+  /** Human-readable new value, e.g. "Over 60 ft" ("—" when empty) */
+  new: string;
+}
+
+/**
+ * A tracked event on a lead's timeline — either a free-text comment or a
+ * recorded edit (with a field-by-field diff). Written by the customer today;
+ * `actor`/`type` leave room for contractor/admin comments later.
+ */
+export interface LeadEvent {
+  id: string;
+  lead_id: string;
+  actor: "customer" | "contractor" | "admin";
+  type: "comment" | "edit";
+  /** Comment text — set when type === "comment" */
+  body?: string | null;
+  /** Field diff — set when type === "edit" */
+  changes?: LeadEventChange[] | null;
+  created_at: string;
+}
